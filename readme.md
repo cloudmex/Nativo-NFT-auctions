@@ -21,7 +21,7 @@ near view $CONTRACT_ID get_last_auction
 near view $CONTRACT_ID get_bid_auction '{"auction_id":0}'
 
 ### auction NEARS in exchange of an NFT or APY
-near call $CONTRACT_ID Bid_for_nft '{"auction_id":0}' --accountId dokxo.testnet --deposit 110
+near call $CONTRACT_ID bid_for_nft '{"auction_id":0}' --accountId dokxo.testnet --deposit 110
 
 ### Pay a auction you received + interes rate (8%)
 near call $CONTRACT_ID pay_auction '{"auction_id":1}' --accountId joehank.testnet --deposit 100

@@ -1,23 +1,22 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap, UnorderedMap, UnorderedSet};
-use near_sdk::{env,ext_contract, Balance,Gas, near_bindgen, AccountId, PromiseOrValue,PanicOnDefault,CryptoHash};
+use near_sdk::{env,ext_contract, Balance, near_bindgen, AccountId, PromiseOrValue,PanicOnDefault,CryptoHash};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::json_types::{U128};
-use near_sdk::serde_json::{json,from_str};
+use near_sdk::serde_json::{from_str};
 use near_sdk::Promise;
 use uint::construct_uint;
 
 //use std::cmp::min;
 
-use crate::internal::*;
+//use crate::internal::*;
 pub use crate::metadata::*;
 
 mod enumeration;
 mod metadata;
 mod internal;
 
-near_sdk::setup_alloc!();
-
+ 
 pub type EpochHeight = u64;
 
 construct_uint! {
@@ -27,16 +26,16 @@ construct_uint! {
 /// Helper structure for keys of the persistent collections.
 #[derive(BorshSerialize)]
 pub enum StorageKey {
-    auctionsPerOwner,
-    auctionPerOwnerInner { account_id_hash: CryptoHash },
-    auctionsPerBidder,
-    auctionPerBidderInner { account_id_hash: CryptoHash },
-    auctionsById,
-    bidsById,
-    bidsByAuctionInner { auction_id: u128 },
+    AuctionsPerOwner,
+    AuctionPerOwnerInner { account_id_hash: CryptoHash },
+    AuctionsPerBidder,
+    AuctionPerBidderInner { account_id_hash: CryptoHash },
+    AuctionsById,
+    BidsById,
+    BidsByAuctionInner { auction_id: u128 },
 
-    auctionsMetadataById,
-    newLookup,
+    AuctionsMetadataById,
+    NewLookup,
 }
 
 
@@ -68,13 +67,13 @@ pub struct NFTAuctions {
     // It is based as 10000=100%
     pub contract_interest: u64,
     //keeps track of the auction struct for a given auction ID
-    pub auctions_by_id: UnorderedMap<auctionId, auction>,
+    pub auctions_by_id: UnorderedMap<AuctionId, Auction>,
     //keeps track of all the auction IDs for a given account
-    pub auctions_per_owner: LookupMap<AccountId, UnorderedSet<auctionId>>,
+    pub auctions_per_owner: LookupMap<AccountId, UnorderedSet<AuctionId>>,
     //keeps track of all the auction IDs for a given account
-    pub auctions_per_Bidder: LookupMap<AccountId, UnorderedSet<auctionId>>,
+    pub auctions_per_bidder: LookupMap<AccountId, UnorderedSet<AuctionId>>,
 
-    pub bids_by_auction_id: UnorderedMap<auctionId, UnorderedSet<Bid>>,
+    pub bids_by_auction_id: UnorderedMap<AuctionId, UnorderedSet<Bid>>,
     /// Total token amount deposited.
     pub total_amount: Balance,
     /// Duration of payment period for auctions
@@ -89,6 +88,8 @@ pub struct NFTAuctions {
 #[near_bindgen]
 impl NFTAuctions {
     //Initialize the contract
+    #![allow(dead_code, unused_variables,irrefutable_let_patterns)]
+    
     #[init]
     pub fn new(
         owner_account_id: AccountId,
@@ -103,10 +104,10 @@ impl NFTAuctions {
             treasury_account_id,
             last_auction_id: 0,
             contract_interest,
-            auctions_by_id: UnorderedMap::new(StorageKey::auctionsById.try_to_vec().unwrap()),
-            auctions_per_owner: LookupMap::new(StorageKey::auctionsPerOwner.try_to_vec().unwrap()),
-            auctions_per_Bidder: LookupMap::new(StorageKey::auctionsPerBidder.try_to_vec().unwrap()),
-            bids_by_auction_id: UnorderedMap::new(StorageKey::bidsById.try_to_vec().unwrap()),
+            auctions_by_id: UnorderedMap::new(StorageKey::AuctionsById.try_to_vec().unwrap()),
+            auctions_per_owner: LookupMap::new(StorageKey::AuctionsPerOwner.try_to_vec().unwrap()),
+            auctions_per_bidder: LookupMap::new(StorageKey::AuctionsPerBidder.try_to_vec().unwrap()),
+            bids_by_auction_id: UnorderedMap::new(StorageKey::BidsById.try_to_vec().unwrap()),
             total_amount: 0,
             payment_period:1_000_000_000 * 60 * 60 * 24 * 7,
             contract_fee, //200=2%
@@ -124,23 +125,23 @@ impl NFTAuctions {
             None
         };*/
         //assert!(msg.is_empty() || msg=="" ,"ERR_INVALID_MESSAGE");
-        let id:auctionId = self.last_auction_id as u128;
+        let id:AuctionId = self.last_auction_id as u128;
         let contract_id = env::predecessor_account_id();
         let signer_id = env::signer_account_id();
         let msg_json: MsgInput = from_str(&msg).unwrap();
-        let bid_start_Id=0 as u128;
+        let bid_start_id=0 as u128;
         //calculate amount to be payed 
         let amount_to_auctioner:u128 = u128::from(msg_json.auction_amount_requested)+(u128::from(msg_json.auction_amount_requested)*u128::from(self.contract_interest)/10000);
         env::log_str(&amount_to_auctioner.to_string());
 
-        let new_auction = auction{
+        let new_auction = Auction{
             nft_contract:contract_id,
             nft_id:token_id,
             nft_owner:signer_id.clone() ,
             description:msg_json.description,
             auction_base_requested:msg_json.auction_amount_requested,
             auction_payback:msg_json.auction_amount_requested,
-            status: auctionStatus::Published,
+            status: AuctionStatus::Published,
             submission_time: env::block_timestamp(),
             auction_time:None,
             auction_deadline:None,
@@ -162,9 +163,9 @@ impl NFTAuctions {
 
     // Bid $NEAR Tokens to a Bid proposal
     #[payable]
-    pub fn Bid_for_nft(&mut self, auction_id: u128) -> Option<auction> {
+    pub fn bid_for_nft(&mut self, auction_id: u128) -> Option<Auction> {
         //use a expect and explain that the auction wasnt found
-        let mut auction:auction = self.auctions_by_id.get(&auction_id.clone()).expect("the token doesn't have an active auction");    
+        let mut auction:Auction = self.auctions_by_id.get(&auction_id.clone()).expect("the token doesn't have an active auction");    
         let new_bid =Bid{
             bidder_id:env::signer_account_id(),
             bid_amount:env::attached_deposit()};
@@ -173,7 +174,7 @@ impl NFTAuctions {
         let attached_deposit=env::attached_deposit();
 
         //Review that NFT is still available for auctioning
-        assert_eq!(auctionStatus::Published==auction.status || auctionStatus::Bidded==auction.status ,true,"The NFT is not available for bidding");
+        assert_eq!(AuctionStatus::Published==auction.status || AuctionStatus::Bidded==auction.status ,true,"The NFT is not available for bidding");
         //Review that amount is the required
         assert_eq!(attached_deposit>=auction.auction_base_requested,true,"The amount payed is less than the base requested");
 
@@ -191,7 +192,7 @@ impl NFTAuctions {
          }
         
          // Update the auction with the new bidder
-        auction.status=auctionStatus::Bidded;
+        auction.status=AuctionStatus::Bidded;
         auction.bidder_id = Some(signer_id.clone());
         auction.auction_payback=attached_deposit;
         auction.auction_time = Some(env::block_timestamp());
@@ -205,7 +206,7 @@ impl NFTAuctions {
         
          self.auctions_by_id.insert(&auction_id, &auction);
          
-         self.internal_add_auction_to_Bidder(&signer_id, &auction_id);
+         self.internal_add_auction_to_bidder(&signer_id, &auction_id);
          self.internal_add_bid_to_auction(auction_id, &new_bid);
         return Some(auction);
     }
@@ -317,7 +318,7 @@ impl NFTAuctions {
     //     auction.status=auctionStatus::Expired;
     //     self.auctions_by_id.insert(&auction_id, &auction);
     //     self.internal_remove_auction_from_owner(&signer_id, &auction_id);
-    //     self.internal_remove_auction_from_Bidder(&signer_id, &auction_id);
+    //     self.internal_remove_auction_from_bidder(&signer_id, &auction_id);
     //     // env::log_str(
     //     //     &json!(&auction)
     //     //     .to_string(),

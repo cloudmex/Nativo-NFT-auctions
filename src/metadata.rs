@@ -1,15 +1,15 @@
 use crate::*;
 
-use std::mem::size_of;
+//use std::mem::size_of;
 
-pub type auctionId = u128;
+pub type AuctionId = u128;
 pub type Bidst = Bid;
 
 
 /// Status of a auction.
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Clone, PartialEq, Debug)]
 #[serde(crate = "near_sdk::serde")]
-pub enum auctionStatus {
+pub enum AuctionStatus {
     //First status when no body had auctioned for this NFT
     Published,
     //auction has been started
@@ -33,7 +33,7 @@ pub enum auctionStatus {
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
 #[serde(crate = "near_sdk::serde")]
-pub struct auction {
+pub struct Auction {
     /// Original nft owner.
     pub nft_owner: AccountId,
     /// Original nft contract.
@@ -47,7 +47,7 @@ pub struct auction {
     /// auction amount that have to be payback
     pub auction_payback: u128,
     /// Current status of the auction
-    pub status: auctionStatus,
+    pub status: AuctionStatus,
     /// Submission time
     pub submission_time: EpochHeight,
     /// When somebody auctioned.
@@ -70,11 +70,11 @@ pub struct Bid {
 /// This is format of output via JSON for the auction.
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
-pub struct auctionOutput {
+pub struct AuctionOutput {
     /// Id of the auction.
-    pub id: auctionId,
+    pub id: AuctionId,
     #[serde(flatten)]
-    pub auction: auction,
+    pub auction: Auction,
 }
 /// This is format of output via JSON for the auction message.
 #[derive( Serialize, Deserialize)]

@@ -1,7 +1,6 @@
 use crate::*;
 use near_sdk::{CryptoHash};
-use std::mem::size_of;
-
+ 
 //used to generate a unique prefix in our storage collections (this is to avoid data collisions)
 pub(crate) fn hash_account_id(account_id: &AccountId) -> CryptoHash {
     //get the default hash
@@ -12,18 +11,19 @@ pub(crate) fn hash_account_id(account_id: &AccountId) -> CryptoHash {
 }
 
 impl NFTAuctions {
+    #![allow(dead_code, unused_variables,irrefutable_let_patterns)]
 
      //add a auction to the set of tokens an owner has
      pub(crate) fn internal_add_bid_to_auction(
         &mut self,
-        auction_id: auctionId,
-        Bid:&Bidst,
+        auction_id: AuctionId,
+        bid:&Bidst,
     ) {
         //get the set of tokens for the given auction
         let mut bids_set = self.bids_by_auction_id.get(&auction_id).unwrap_or_else(|| {
             //if the account doesn't have any tokens, we create a new unordered set
             UnorderedSet::new(
-                StorageKey::bidsByAuctionInner {
+                StorageKey::BidsByAuctionInner {
                     //we get a new unique prefix for the collection
                     auction_id: (auction_id),
                 }
@@ -33,7 +33,7 @@ impl NFTAuctions {
         });
 
         //we insert the token ID into the set
-        bids_set.insert(Bid);
+        bids_set.insert(bid);
 
         //we insert that set for the given account ID. 
         self.bids_by_auction_id.insert(&auction_id, &bids_set);
@@ -46,13 +46,13 @@ impl NFTAuctions {
     pub(crate) fn internal_add_auction_to_owner(
         &mut self,
         account_id: &AccountId,
-        auction_id: &auctionId,
+        auction_id: &AuctionId,
     ) {
         //get the set of tokens for the given account
         let mut auctions_set = self.auctions_per_owner.get(account_id).unwrap_or_else(|| {
             //if the account doesn't have any tokens, we create a new unordered set
             UnorderedSet::new(
-                StorageKey::auctionPerOwnerInner {
+                StorageKey::AuctionPerOwnerInner {
                     //we get a new unique prefix for the collection
                     account_id_hash: hash_account_id(&account_id),
                 }
@@ -68,11 +68,11 @@ impl NFTAuctions {
         self.auctions_per_owner.insert(account_id, &auctions_set);
     }
 
-    //remove a token from an owner (internal method and can't be called directly via CLI).
+     //remove a token from an owner (internal method and can't be called directly via CLI).
     pub(crate) fn internal_remove_auction_from_owner(
         &mut self,
         account_id: &AccountId,
-        auction_id: &auctionId,
+        auction_id: &AuctionId,
     ) {
         //we get the set of tokens that the owner has
         let mut auctions_set = self
@@ -93,16 +93,16 @@ impl NFTAuctions {
         }
     }
 
-    pub(crate) fn internal_add_auction_to_Bidder(
+    pub(crate) fn internal_add_auction_to_bidder(
         &mut self,
         account_id: &AccountId,
-        auction_id: &auctionId,
+        auction_id: &AuctionId,
     ) {
         //get the set of tokens for the given account
-        let mut auctions_set = self.auctions_per_Bidder.get(account_id).unwrap_or_else(|| {
+        let mut auctions_set = self.auctions_per_bidder.get(account_id).unwrap_or_else(|| {
             //if the account doesn't have any tokens, we create a new unordered set
             UnorderedSet::new(
-                StorageKey::auctionPerBidderInner {
+                StorageKey::AuctionPerBidderInner {
                     //we get a new unique prefix for the collection
                     account_id_hash: hash_account_id(&account_id),
                 }
@@ -115,18 +115,18 @@ impl NFTAuctions {
         auctions_set.insert(auction_id);
 
         //we insert that set for the given account ID. 
-        self.auctions_per_Bidder.insert(account_id, &auctions_set);
+        self.auctions_per_bidder.insert(account_id, &auctions_set);
     }
 
     //remove a token from an owner (internal method and can't be called directly via CLI).
-    pub(crate) fn internal_remove_auction_from_Bidder(
+    pub(crate) fn internal_remove_auction_from_bidder(
         &mut self,
         account_id: &AccountId,
-        auction_id: &auctionId,
+        auction_id: &AuctionId,
     ) {
         //we get the set of tokens that the owner has
         let mut auctions_set = self
-            .auctions_per_Bidder
+            .auctions_per_bidder
             .get(account_id)
             //if there is no set of tokens for the owner, we panic with the following message:
             .expect("auction should be lended by the sender");
@@ -136,10 +136,10 @@ impl NFTAuctions {
 
         //if the token set is now empty, we remove the owner from the tokens_per_owner collection
         if auctions_set.is_empty() {
-            self.auctions_per_Bidder.remove(account_id);
+            self.auctions_per_bidder.remove(account_id);
         } else {
         //if the token set is not empty, we simply insert it back for the account ID. 
-            self.auctions_per_Bidder.insert(account_id, &auctions_set);
+            self.auctions_per_bidder.insert(account_id, &auctions_set);
         }
     }
 }

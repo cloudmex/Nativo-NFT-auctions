@@ -2,13 +2,14 @@ use crate::*;
 
 #[near_bindgen]
 impl NFTAuctions {
+    #![allow(dead_code, unused_variables,irrefutable_let_patterns)]
 
     //get the information for a specific token ID
-    fn get_nft_auction(&self, auction_id: auctionId) -> Option<auctionOutput> {
+    fn get_nft_auction(&self, auction_id: AuctionId) -> Option<AuctionOutput> {
         //if there is some auction ID in the auctions_by_id collection
         if let auctions = self.auctions_by_id.get(&auction_id).unwrap() {
             //we'll return the data for that auction
-            Some(auctionOutput {
+            Some(AuctionOutput {
                 id:auction_id,
                 auction:auctions.into(),
             })
@@ -18,7 +19,7 @@ impl NFTAuctions {
     }
 
     //get the information for a specific token ID
-   pub fn get_bid_auction(&self, auction_id: auctionId) -> Option< Vec<Bid>  >{
+   pub fn get_bid_auction(&self, auction_id: AuctionId) -> Option< Vec<Bid>  >{
         //if there is some auction ID in the auctions_by_id collection
         if let bid = self.bids_by_auction_id.get(&auction_id).unwrap() {
             //we'll return the data for that auction
@@ -28,16 +29,16 @@ impl NFTAuctions {
         }
     }
 
-    // pub fn get_nft_auction(&self, auction_id: u64) -> auctionOutput {
+    // pub fn get_nft_auction(&self, auction_id: u64) -> AuctionOutput {
     //     let auctions = self.auctions.get(&auction_id).expect("ERR_NO_auction");
-    //     auctionOutput {
+    //     AuctionOutput {
     //         id:auction_id,
     //         auction: auctions.into(),
     //     }
     // }
 
     //Query for nft tokens on the contract regardless of the owner using pagination
-    pub fn get_nfts_for_auction(&self, from_index: Option<U128>, limit: Option<u64>) -> Vec<auctionOutput> {
+    pub fn get_nfts_for_auction(&self, from_index: Option<U128>, limit: Option<u64>) -> Vec<AuctionOutput> {
         //where to start pagination - if we have a from_index, we'll use that - otherwise start from 0 index
         let start = u128::from(from_index.unwrap_or(U128(0)));
 
@@ -69,10 +70,10 @@ impl NFTAuctions {
 //         .collect()
 // }
     //View wich NFT are available for auctioning
-    // pub fn get_nfts_for_auction(&self, from_index: u64, limit: u64)-> Vec<auctionOutput> {
+    // pub fn get_nfts_for_auction(&self, from_index: u64, limit: u64)-> Vec<AuctionOutput> {
     //     (from_index..min(self.last_auction_id, from_index + limit))
     //         .filter_map(|id| {
-    //             self.auctions.get(&id).map(|auction| auctionOutput {
+    //             self.auctions.get(&id).map(|auction| AuctionOutput {
     //                 id,
     //                 auction: auction.into(),
     //             })
@@ -113,7 +114,7 @@ impl NFTAuctions {
         account_id: AccountId,
         from_index: Option<U128>,
         limit: Option<u64>,
-    ) -> Vec<auctionOutput> {
+    ) -> Vec<AuctionOutput> {
         //get the set of tokens for the passed in owner
         let auctions_for_owner_set = self.auctions_per_owner.get(&account_id);
         //if there is some set of tokens, we'll set the tokens variable equal to that set
@@ -141,16 +142,16 @@ impl NFTAuctions {
 
 
     //get the total supply of NFTs for a given owner
-    pub fn auction_supply_for_Bidder(
+    pub fn auction_supply_for_bidder(
         &self,
         account_id: AccountId,
     ) -> U128 {
         //get the set of tokens for the passed in owner
-        let auctions_for_Bidder_set = self.auctions_per_Bidder.get(&account_id);
+        let auctions_for_bidder_set = self.auctions_per_bidder.get(&account_id);
 
         //if there is some set of tokens, we'll return the length as a U128
-        if let Some(auctions_for_Bidder_set) = auctions_for_Bidder_set {
-            U128(auctions_for_Bidder_set.len() as u128)
+        if let Some(auctions_for_bidder_set) = auctions_for_bidder_set {
+            U128(auctions_for_bidder_set.len() as u128)
         } else {
             //if there isn't a set of tokens for the passed in account ID, we'll return 0
             U128(0)
@@ -158,17 +159,17 @@ impl NFTAuctions {
     }
 
     //Query for all the tokens for an owner
-    pub fn auctions_for_Bidder(
+    pub fn auctions_for_bidder(
         &self,
         account_id: AccountId,
         from_index: Option<U128>,
         limit: Option<u64>,
-    ) -> Vec<auctionOutput> {
+    ) -> Vec<AuctionOutput> {
         //get the set of tokens for the passed in owner
-        let auctions_for_Bidder_set = self.auctions_per_Bidder.get(&account_id);
+        let auctions_for_bidder_set = self.auctions_per_bidder.get(&account_id);
         //if there is some set of tokens, we'll set the tokens variable equal to that set
-        let auctions = if let Some(auctions_for_Bidder_set) = auctions_for_Bidder_set {
-            auctions_for_Bidder_set
+        let auctions = if let Some(auctions_for_bidder_set) = auctions_for_bidder_set {
+            auctions_for_bidder_set
         } else {
             //if there is no set of tokens, we'll simply return an empty vector. 
             return vec![];
