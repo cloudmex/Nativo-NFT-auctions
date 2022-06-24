@@ -11,9 +11,12 @@ use uint::construct_uint;
 
 //use crate::internal::*;
 pub use crate::metadata::*;
+pub use crate::migrate::*;
 
 mod enumeration;
 mod metadata;
+mod migrate;
+
 mod internal;
 
  
@@ -82,7 +85,33 @@ pub struct NFTAuctions {
     pub contract_fee:u64, //200=2%
 }
 
+#[near_bindgen]
+#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
+pub struct PrevNFTAuctions {
+    /// Owner's account ID (it will be a DAO on phase II)
+    pub owner_account_id: AccountId,
+    /// Owner's account ID (it will be a DAO on phase II)
+    pub treasury_account_id: AccountId,
+    //Index for auctions
+    pub last_auction_id: u64,
+    // Transaction interest estimated for the NFT payment
+    // It is based as 10000=100%
+    pub contract_interest: u64,
+    //keeps track of the auction struct for a given auction ID
+    pub auctions_by_id: UnorderedMap<AuctionId, Auction>,
+    //keeps track of all the auction IDs for a given account
+    pub auctions_per_owner: LookupMap<AccountId, UnorderedSet<AuctionId>>,
+    //keeps track of all the auction IDs for a given account
+    pub auctions_per_bidder: LookupMap<AccountId, UnorderedSet<AuctionId>>,
 
+    pub bids_by_auction_id: UnorderedMap<AuctionId, UnorderedSet<Bid>>,
+    /// Total token amount deposited.
+    pub total_amount: Balance,
+    /// Duration of payment period for auctions
+    pub payment_period: u64,
+    /// Fee payed to Nativo auctions
+    pub contract_fee:u64, //200=2%
+}
 
 
 #[near_bindgen]
@@ -338,6 +367,11 @@ impl NFTAuctions {
 
 
     /**/
+
+     //method to test the remote upgrade
+     pub fn remote_done(&self) -> String {
+        "Holaa remote now2 ".to_string()
+     }
 }
 
 
