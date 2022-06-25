@@ -20,13 +20,16 @@ pub enum AuctionStatus {
     Bidded,
     //auction has been finished
     Finished,
-    /// Expired after period of time. auctioner claimed the NFT.
+    /// Expired after period of time. auctioner  can claim the NFT.
     Expired,
     /// If NFT owner payed back for the auction
     Payed,
     // If no body auctioned for this NFT. This status gets after owners claim back its NFT.
     Canceled,
+    //if the auction its ended and has a bid 
+    Claimed,
     New,
+    NotFound,
 }
 
 /// Proposal for auctioning that are sent to this DAO.
@@ -43,16 +46,16 @@ pub struct Auction {
     /// Description of this auction.
     pub description: Option<String>,
     /// auction amount requested
-    pub auction_base_requested: u128,
-    /// auction amount that have to be payback
-    pub auction_payback: u128,
+    pub auction_base_requested: SalePriceInYoctoNear,
+    /// auction amount that have to be payback to the nft owner
+    pub auction_payback: SalePriceInYoctoNear,
     /// Current status of the auction
     pub status: AuctionStatus,
     /// Submission time
     pub submission_time: EpochHeight,
     /// When somebody auctioned.
     pub auction_time: Option<EpochHeight>,
-    /// When will the auctioning end and the auctioner can withdraw the NFT
+    /// When will the bidding end and the bidder can withdraw the NFT
     /// Also is the deadline when NFT owner can payback
     pub auction_deadline: Option<EpochHeight>,
     pub bidder_id: Option<AccountId>,
@@ -65,7 +68,7 @@ pub struct Bid {
     /// Id of the auction.
     pub bidder_id: AccountId,
 
-    pub bid_amount: u128,
+    pub bid_amount: SalePriceInYoctoNear,
 }
 /// This is format of output via JSON for the auction.
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
@@ -81,7 +84,7 @@ pub struct AuctionOutput {
 #[serde(crate = "near_sdk::serde")]
 pub struct MsgInput {
     pub description: Option<String>,
-    pub auction_amount_requested: u128,
+    pub auction_amount_requested: SalePriceInYoctoNear,
 }
 
 

@@ -38,7 +38,7 @@ impl NFTAuctions {
     // }
 
     //Query for nft tokens on the contract regardless of the owner using pagination
-    pub fn get_nfts_for_auction(&self, from_index: Option<U128>, limit: Option<u64>) -> Vec<AuctionOutput> {
+    pub fn get_all_nfts_for_auction(&self, from_index: Option<U128>, limit: Option<u64>) -> Vec<AuctionOutput> {
         //where to start pagination - if we have a from_index, we'll use that - otherwise start from 0 index
         let start = u128::from(from_index.unwrap_or(U128(0)));
 
@@ -52,6 +52,54 @@ impl NFTAuctions {
             .map(|auction_id| self.get_nft_auction(auction_id.clone()).unwrap())
             //since we turned the keys into an iterator, we need to turn it back into a vector to return
             .collect()
+    }
+
+    //this method return  all the auctions with status published or bidded
+    pub fn get_nfts_for_auction(&self, from_index: Option<U128>, limit: Option<u64>) -> Vec<AuctionOutput> {
+        //where to start pagination - if we have a from_index, we'll use that - otherwise start from 0 index
+        let start = u128::from(from_index.unwrap_or(U128(0)));
+
+        //iterate through each token using an iterator
+        self.auctions_by_id.keys_as_vector().iter()
+            //skip to the index we specified in the start variable
+            .skip(start as usize) 
+            //take the first "limit" elements in the vector. If we didn't specify a limit, use 50
+            .take(limit.unwrap_or(50) as usize) 
+            //we'll map the token IDs which are strings into Json Tokens
+            .filter_map(|auction_id|{
+                        let action_g = self.get_nft_auction(auction_id).unwrap_or( AuctionOutput{
+                              id: auction_id,
+                              auction: self.new_auction(),
+                                                
+                         });
+                    if action_g.auction.status== AuctionStatus::Published || action_g.auction.status== AuctionStatus::Bidded{
+                        Some(self.get_nft_auction(auction_id).unwrap())
+                    }else{
+                        None
+                    }
+                }
+            )
+            //since we turned the keys into an iterator, we need to turn it back into a vector to return
+            .collect()
+    }
+
+    //its al helped method that return a empty auction
+    fn new_auction  (&self) -> Auction{
+        let new_auction = Auction{
+            nft_contract:"null".to_string().try_into().unwrap(),
+            nft_id:"null".to_string().try_into().unwrap(),
+            nft_owner:"null".to_string().try_into().unwrap() ,
+            description:"null".to_string().try_into().unwrap(),
+            auction_base_requested:0.into(),
+            auction_payback:0.into(),
+            status: AuctionStatus::NotFound,
+            submission_time: env::block_timestamp(),
+            auction_time:None,
+            auction_deadline:None,
+            bidder_id:None,
+            
+         };
+         new_auction
     }
 //   //Query for nft tokens on the contract regardless of the owner using pagination
 //   pub fn get_bids_for_auction(&self, from_index: Option<U128>, limit: Option<u64>) -> Vec<Bid> {
