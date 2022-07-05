@@ -84,8 +84,23 @@ pub struct NFTAuctions {
     pub payment_period: u64,
     /// Fee payed to Nativo auctions
     pub contract_fee:u64, //200=2%
+    // a flag to start/stop the ntv minting
+    pub is_minting_ntv:bool,
+    //
+    pub ntv_multiply:u128,
+    //how much auctions are running
+    pub auctions_active: u128,
+    //how much money has made by auctions
+    pub auctions_amount_sold: u128,
+    //how much ATH has made by auctions
+    pub auctions_current_ath: u128,
 }
 
+
+#[ext_contract(ext_nft)]
+pub trait ExternsContract {
+    fn mint(&self, account_id:AccountId,amount: String) -> String;
+ }
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct PrevNFTAuctions {
@@ -112,13 +127,27 @@ pub struct PrevNFTAuctions {
     pub payment_period: u64,
     /// Fee payed to Nativo auctions
     pub contract_fee:u64, //200=2%
+     // a flag to start/stop the ntv minting
+     pub is_minting_ntv:bool,
+
+     pub ntv_multiply:u128,
+
+     //how much auctions are running
+     pub auctions_active: u128,
+     //how much money has made by auctions
+     pub auctions_amount_sold: u128,
+     //how much ATH has made by auctions
+     pub auctions_current_ath: u128,
 }
 
+
+
+const NTVTOKEN_CONTRACT:  &str = "nativo_token.testnet";
 
 #[near_bindgen]
 impl NFTAuctions {
     //Initialize the contract
-    #![allow(dead_code, unused_variables,irrefutable_let_patterns)]
+    #![allow(dead_code, unused_variables,irrefutable_let_patterns,unconditional_recursion)]
     
     #[init]
     pub fn new(
@@ -141,7 +170,12 @@ impl NFTAuctions {
             total_amount: 0,
             payment_period:    1_000_000_000 * 60 * 60 * 24 * 7, //this is for a week
             contract_fee, //200=2%
-        };
+            is_minting_ntv:true,
+            ntv_multiply:3,
+            auctions_active: 0,
+            auctions_amount_sold: 0,
+            auctions_current_ath: 0,
+                };
         return result;
     }
 
@@ -163,20 +197,21 @@ impl NFTAuctions {
         //calculate amount to be payed 
         let amount_to_auctioner:u128 = u128::from(msg_json.auction_amount_requested)+(u128::from(msg_json.auction_amount_requested)*u128::from(self.contract_interest)/10000);
         env::log_str(&amount_to_auctioner.to_string());
-
+        let media = msg_json.media.expect("the media is empty");
 
         //assert that the token and contract dont already exists in a old auction
         let new_auction = Auction{
             nft_contract:contract_id,
             nft_id:token_id,
             nft_owner:signer_id.clone() ,
+            nft_media:Some(media),
             description:msg_json.description,
             auction_base_requested:msg_json.auction_amount_requested,
             auction_payback:msg_json.auction_amount_requested,
             status: AuctionStatus::Published,
             submission_time: env::block_timestamp(),
-            auction_time:None,
-            auction_deadline:None,
+            auction_time :None,
+            auction_deadline:Some(env::block_timestamp()+ self.payment_period),
             bidder_id:None,
             
          };
@@ -184,6 +219,7 @@ impl NFTAuctions {
        
         self.internal_add_auction_to_owner(&signer_id, &id);
         self.last_auction_id += 1;
+        self.auctions_active += 1;
         /*env::log_str(
             &json!(new_auction)
             .to_string(),
@@ -209,11 +245,15 @@ impl NFTAuctions {
         //Review that NFT is still available for auctioning
        assert_eq!(AuctionStatus::Published==auction.status || AuctionStatus::Bidded==auction.status ,true,"The NFT is not available for bidding");
        //check if the auction time has pased   
-       if auction.auction_time.is_some(){
+       if auction.auction_deadline.unwrap() <= env::block_timestamp(){
+            env::log_str(&"ya paso la hora d hacer bids".to_string());
                 // change the state to expired to dont allow more bids
                 auction.status=AuctionStatus::Expired;
+
+                self.auctions_by_id.insert(&auction_id, &auction);
+
                 //panic by the end time
-                assert_eq!(auction.auction_time.unwrap() >= env::block_timestamp(),true,"The bid time has expired" );
+                assert_eq!(auction.auction_deadline.unwrap() >= env::block_timestamp(),true,"The bid time has expired" );
 
             }
         //Review that  base amount is the required
@@ -236,10 +276,11 @@ impl NFTAuctions {
          // Update the auction with the new bidder
         auction.status=AuctionStatus::Bidded;
         auction.bidder_id = Some(signer_id.clone());
-        auction.auction_payback=attached_deposit.into();
+        auction.auction_payback=attached_deposit.clone().into();
         auction.auction_time = Some(env::block_timestamp());
-        //auction.auction_deadline = Some(env::block_timestamp()+60);
-        auction.auction_deadline = Some(env::block_timestamp()+self.payment_period);
+        auction.auction_deadline = Some(env::block_timestamp()+60000000000);
+         self.total_amount+=attached_deposit;
+        //auction.auction_deadline = Some(env::block_timestamp()+self.payment_period);
 
          
 
@@ -288,6 +329,7 @@ impl NFTAuctions {
         auction.status=AuctionStatus::Canceled;
         self.auctions_by_id.insert(&auction_id, &auction);
         self.internal_remove_auction_from_owner(&signer_id, &auction_id);
+        self.auctions_active-=1;
         // env::log_str(
         //     &json!(&auction)
         //     .to_string(),
@@ -387,14 +429,55 @@ impl NFTAuctions {
         self.auctions_by_id.insert(&auction_id, &auction);
         self.internal_remove_auction_from_owner(&auction.nft_owner, &auction_id);
         self.internal_remove_auction_from_bidder(&signer_id, &auction_id);
+        self.auctions_active -=1;
         // env::log_str(
         //     &json!(&auction)
         //     .to_string(),
         // );
 
+            //save the amount for the amount_sold
+            let amount_sold :u128=auction.auction_payback.clone().into();
+            self.auctions_amount_sold+=amount_sold;
 
+            //save the ATH amount in an auction sold
+            if self.auctions_current_ath<amount_sold {
+                self.auctions_current_ath=amount_sold;
+            }
+           // self.auctions_amount_sold+= 
         // we pay the highest bid to the owner auction
-        Promise::new(old_owner).transfer(auction_payback.into()); 
+        let contract_percent:u128 = self.contract_fee.into();
+        let fee_percent=contract_percent/1000;
+        let nativo_fee =amount_sold*fee_percent;
+        let owner_payment =amount_sold-nativo_fee;
+        Promise::new(self.treasury_account_id.clone()).transfer(nativo_fee); 
+
+        Promise::new(old_owner.clone()).transfer(owner_payment); 
+
+
+        //minting the nvt section
+        if self.is_minting_ntv {
+
+            let tokens_to_mint = amount_sold *self.ntv_multiply;
+            // NTV for the buyer
+            ext_nft::mint(
+                signer_id.clone(),
+                tokens_to_mint.to_string(),
+                NTVTOKEN_CONTRACT.to_string().try_into().unwrap(),
+                0000000000000000000000001,
+                10_000_000_000_000.into(),
+            );
+             // NTV for the owner
+            ext_nft::mint(
+                old_owner,
+                tokens_to_mint.to_string(),
+                NTVTOKEN_CONTRACT.to_string().try_into().unwrap(),
+                0000000000000000000000001,
+                10_000_000_000_000.into(),
+            );
+
+        }else{
+            env::log_str("the nvt token minting is disabled");      
+          }
         // Inside a contract function on ContractA, a cross contract call is started
         // From ContractA to ContractB
         ext_contract_nft::nft_transfer(
@@ -409,10 +492,70 @@ impl NFTAuctions {
 
 
     /**/
+    // set a new owner
+   
+    pub fn set_new_owner(&mut self,new_owner:AccountId) -> String {
+        self.is_the_owner();
+        self.owner_account_id=new_owner;
+        self.owner_account_id.to_string()
+    }
+    // set a new treasury
+     pub fn set_new_treasury(&mut self,new_treasury:AccountId) -> String {
+        self.is_the_owner();
+        self.treasury_account_id=new_treasury;
+        self.treasury_account_id.to_string()
+    }
 
+     // set a new contract interest
+
+     pub fn set_new_contract_interest(&mut self,new_contract_interest:u64) -> String {
+         self.is_the_owner();
+         self.contract_interest=new_contract_interest;
+         self.contract_interest.to_string()
+     }
+
+      // set a new contract interest
+       pub fn set_new_payment_period(&mut self,new_payment_period:u64) -> String {
+          self.is_the_owner();
+          self.payment_period=new_payment_period;
+          self.payment_period.to_string()
+      }
+        // set a new contract interest
+       pub fn set_new_contract_fee(&mut self,new_contract_fee:u64) -> String {
+          self.is_the_owner();
+          self.contract_fee=new_contract_fee;
+          self.contract_fee.to_string()
+      }
+
+       pub fn set_is_minting_ntv(&mut self,is_enable:bool) -> String {
+          self.is_the_owner();
+          self.is_minting_ntv=is_enable;
+          self.is_minting_ntv.to_string()
+      }
+      pub fn get_auctions_stats(& self) -> Metrics {
+         let metrics = Metrics {
+             
+              total_auctions: self.last_auction_id,
+             
+              total_amount_deposited: self.total_amount.into(),
+             
+              ntv_status:self.is_minting_ntv,
+             
+              total_auctions_active: self.auctions_active,
+             
+              total_auctions_amount_sold: self.auctions_amount_sold.into(),
+             
+              max_auctions_ath: self.auctions_current_ath.into(),
+        };
+        metrics
+    }
      //method to test the remote upgrade
      pub fn remote_done(&self) -> String {
         "Holaa remote now2 ".to_string()
+     }
+
+      fn is_the_owner(&self){
+        assert_eq!(self.owner_account_id,env::signer_account_id(),"you aren't the owner")
      }
 }
 

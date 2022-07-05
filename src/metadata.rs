@@ -43,6 +43,8 @@ pub struct Auction {
     pub nft_contract: AccountId,
     /// NFT id in origin contract.
     pub nft_id: String,
+    /// NFT media in origin contract.
+    pub nft_media: Option<String>,
     /// Description of this auction.
     pub description: Option<String>,
     /// auction amount requested
@@ -70,6 +72,26 @@ pub struct Bid {
 
     pub bid_amount: SalePriceInYoctoNear,
 }
+
+
+
+#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize,Debug)]
+#[serde(crate = "near_sdk::serde")]
+pub struct Metrics {
+    //Index for auctions
+    pub total_auctions: u64,
+    //how much auctions are running
+    pub total_auctions_active: u128,
+    /// Total token amount deposited.
+    pub total_amount_deposited: SalePriceInYoctoNear,
+    // a flag to start/stop the ntv minting
+    pub ntv_status:bool,
+   
+    //how much money has made by auctions
+    pub total_auctions_amount_sold: SalePriceInYoctoNear,
+    //how much ATH has made by auctions
+    pub max_auctions_ath: SalePriceInYoctoNear,
+}
 /// This is format of output via JSON for the auction.
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
@@ -85,6 +107,7 @@ pub struct AuctionOutput {
 pub struct MsgInput {
     pub description: Option<String>,
     pub auction_amount_requested: SalePriceInYoctoNear,
+    pub media: Option<String>,
 }
 
 
