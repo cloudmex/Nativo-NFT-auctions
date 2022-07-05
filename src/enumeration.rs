@@ -2,8 +2,8 @@ use crate::*;
 
 #[near_bindgen]
 impl NFTAuctions {
-    #![allow(dead_code, unused_variables,irrefutable_let_patterns)]
-
+    #![allow(dead_code, unused_variables,irrefutable_let_patterns,)]
+    #[warn(unconditional_recursion)]
     //get the information for a specific token ID
     fn get_nft_auction(&self, auction_id: AuctionId) -> Option<AuctionOutput> {
         //if there is some auction ID in the auctions_by_id collection
@@ -89,6 +89,7 @@ impl NFTAuctions {
             nft_contract:"null".to_string().try_into().unwrap(),
             nft_id:"null".to_string().try_into().unwrap(),
             nft_owner:"null".to_string().try_into().unwrap() ,
+            nft_media:"null".to_string().try_into().unwrap() ,
             description:"null".to_string().try_into().unwrap(),
             auction_base_requested:0.into(),
             auction_payback:0.into(),
@@ -101,34 +102,7 @@ impl NFTAuctions {
          };
          new_auction
     }
-//   //Query for nft tokens on the contract regardless of the owner using pagination
-//   pub fn get_bids_for_auction(&self, from_index: Option<U128>, limit: Option<u64>) -> Vec<Bid> {
-//     //where to start pagination - if we have a from_index, we'll use that - otherwise start from 0 index
-//     let start = u128::from(from_index.unwrap_or(U128(0)));
-
-//     //iterate through each token using an iterator
-//     self.bids_by_auction_id.keys_as_vector().iter()
-//         //skip to the index we specified in the start variable
-//         .skip(start as usize) 
-//         //take the first "limit" elements in the vector. If we didn't specify a limit, use 50
-//         .take(limit.unwrap_or(50) as usize) 
-//         //we'll map the token IDs which are strings into Json Tokens
-//         .map(|auction_id| self.get_bid_auction(auction_id.clone()).unwrap())
-//         //since we turned the keys into an iterator, we need to turn it back into a vector to return
-//         .collect()
-// }
-    //View wich NFT are available for auctioning
-    // pub fn get_nfts_for_auction(&self, from_index: u64, limit: u64)-> Vec<AuctionOutput> {
-    //     (from_index..min(self.last_auction_id, from_index + limit))
-    //         .filter_map(|id| {
-    //             self.auctions.get(&id).map(|auction| AuctionOutput {
-    //                 id,
-    //                 auction: auction.into(),
-    //             })
-    //         })
-    //         .collect()
-    // }
-
+ 
     //View the auction_id of the last auction
     pub fn get_contract_interest(&self)-> u64 {
         self.contract_interest
@@ -236,5 +210,34 @@ impl NFTAuctions {
             .map(|auction_id| self.get_nft_auction(auction_id.clone()).unwrap())
             //since we turned the keys into an iterator, we need to turn it back into a vector to return
             .collect()
+    }
+
+
+    pub fn get_contract_owmer(&self)->AccountId {
+        self.owner_account_id.clone()
+    }
+    pub fn get_contract_treasury(&self)->AccountId {
+        self.treasury_account_id.clone()
+    }
+    pub fn get_payment_period(&self)->u64 {
+        self.payment_period.clone()
+    }
+    
+    pub fn get_contract_fee(&self)->u64 {
+        self.contract_fee.clone()
+    }
+    
+    pub fn is_ntv_enable_minting(&self)->bool {
+        self.is_minting_ntv
+    }
+    pub fn get_auctions_actives(&self)->u128 {
+        self.auctions_active
+    }
+
+    pub fn get_auctions_amount_sold(&self)->u128 {
+        self.auctions_amount_sold
+    }
+    pub fn get_auctions_current_ath(&self)->u128 {
+        self.auctions_current_ath
     }
 }

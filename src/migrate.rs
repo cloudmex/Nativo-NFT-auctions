@@ -66,8 +66,13 @@ impl NFTAuctions {
               auctions_per_bidder:   old_state.auctions_per_bidder,
               bids_by_auction_id:    old_state.bids_by_auction_id,
               total_amount:          old_state.total_amount,
-              payment_period:        old_state.payment_period  ,
+              payment_period:        old_state.payment_period, // 1_000_000_000 * 60 * 60 * 24 * 7  ,
               contract_fee:          old_state.contract_fee,
+              is_minting_ntv:        old_state.is_minting_ntv, //true,
+              ntv_multiply:          3, //old_state.ntv_multiply, //3,
+              auctions_active:       old_state.auctions_active, //0,
+              auctions_amount_sold:  old_state.auctions_amount_sold, //0,
+              auctions_current_ath:  old_state.auctions_current_ath, //0,
 
         }
     }
@@ -92,7 +97,12 @@ impl NFTAuctions {
             bids_by_auction_id:    UnorderedMap::new(StorageKey::BidsById.try_to_vec().unwrap()),
             total_amount:          0,
             payment_period:        1_000_000_000 * 60 * 60 * 24 * 7,
-            contract_fee:          old_state.contract_interest, 
+            contract_fee:          old_state.contract_fee, 
+            is_minting_ntv:        true,
+            ntv_multiply:          3,
+            auctions_active:       0,
+            auctions_amount_sold:  0,
+            auctions_current_ath:  0,
 
         }
     }
