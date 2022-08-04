@@ -52,7 +52,7 @@ impl NFTAuctions {
     #[private]
     #[init(ignore_state)]
     pub fn migrate() -> Self {
-        let old_state: PrevNFTAuctions = env::state_read().expect("failed");
+         let old_state: PrevNFTAuctions = env::state_read().expect("failed");
         
         env::log_str("old state readed");
         Self {
@@ -73,6 +73,7 @@ impl NFTAuctions {
               auctions_active:       old_state.auctions_active, //0,
               auctions_amount_sold:  old_state.auctions_amount_sold, //0,
               auctions_current_ath:  old_state.auctions_current_ath, //0,
+              ntv_token_contract:    "nativo_token.testnet".to_string(),
 
         }
     }
@@ -103,7 +104,7 @@ impl NFTAuctions {
             auctions_active:       0,
             auctions_amount_sold:  0,
             auctions_current_ath:  0,
-
+            ntv_token_contract:    "nativo_token.testnet".to_string(),
         }
     }
 

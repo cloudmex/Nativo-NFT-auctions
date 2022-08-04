@@ -2,6 +2,7 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap, UnorderedMap, UnorderedSet};
 use near_sdk::{env,ext_contract,Gas, Balance, near_bindgen, AccountId, PromiseOrValue,PanicOnDefault,CryptoHash};
 use near_sdk::serde::{Deserialize, Serialize};
+
 use near_sdk::json_types::{U128};
 use near_sdk::serde_json::{from_str};
 use near_sdk::Promise;
@@ -12,10 +13,12 @@ use uint::construct_uint;
 //use crate::internal::*;
 pub use crate::metadata::*;
 pub use crate::migrate::*;
+pub use crate::dao::*;
 
 mod enumeration;
 mod metadata;
 mod migrate;
+mod dao;
 
 mod internal;
 
@@ -58,6 +61,16 @@ trait NonFungibleToken {
 
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct AccountActive {
+
+    pub owner:String,
+    pub treasury:String,
+    pub nvt:String,
+
+
+}
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct NFTAuctions {
@@ -94,6 +107,8 @@ pub struct NFTAuctions {
     pub auctions_amount_sold: u128,
     //how much ATH has made by auctions
     pub auctions_current_ath: u128,
+    
+    pub ntv_token_contract:String,
 }
 
 
@@ -142,8 +157,7 @@ pub struct PrevNFTAuctions {
 
 
 
-const NTVTOKEN_CONTRACT:  &str = "nativo_token.testnet";
-
+ 
 #[near_bindgen]
 impl NFTAuctions {
     //Initialize the contract
@@ -175,6 +189,7 @@ impl NFTAuctions {
             auctions_active: 0,
             auctions_amount_sold: 0,
             auctions_current_ath: 0,
+            ntv_token_contract:    "nativo_token.testnet".to_string(),
                 };
         return result;
     }
@@ -184,11 +199,7 @@ impl NFTAuctions {
     // When transfered succesful it is saved as a new requesting for auctioning
     pub fn nft_on_transfer(&mut self,sender_id: AccountId,previous_owner_id: AccountId,token_id: String,msg: String)  -> PromiseOrValue<bool>{
         env::log_str(&msg.to_string());
-        /*if msg.is_empty() || msg=="" {
-            env::log_str("ERR_INVALID_MESSAGE");
-            None
-        };*/
-        //assert!(msg.is_empty() || msg=="" ,"ERR_INVALID_MESSAGE");
+       
         let id:AuctionId = self.last_auction_id as u128;
         let contract_id = env::predecessor_account_id();
         let signer_id = env::signer_account_id();
@@ -209,9 +220,9 @@ impl NFTAuctions {
             auction_base_requested:msg_json.auction_amount_requested,
             auction_payback:msg_json.auction_amount_requested,
             status: AuctionStatus::Published,
-            submission_time: env::block_timestamp(),
+            submission_time: (env::block_timestamp()/1000000),
             auction_time :None,
-            auction_deadline:Some(env::block_timestamp()+ self.payment_period),
+            auction_deadline:Some( (env::block_timestamp()/1000000) + (self.payment_period*1000)),
             bidder_id:None,
             
          };
@@ -220,11 +231,8 @@ impl NFTAuctions {
         self.internal_add_auction_to_owner(&signer_id, &id);
         self.last_auction_id += 1;
         self.auctions_active += 1;
-        /*env::log_str(
-            &json!(new_auction)
-            .to_string(),
-        );*/
         
+     
         //If for some reason the contract failed it need to returns the NFT to the orig&inal owner (true)
         return PromiseOrValue::Value(false);
     }
@@ -245,15 +253,14 @@ impl NFTAuctions {
         //Review that NFT is still available for auctioning
        assert_eq!(AuctionStatus::Published==auction.status || AuctionStatus::Bidded==auction.status ,true,"The NFT is not available for bidding");
        //check if the auction time has pased   
-       if auction.auction_deadline.unwrap() <= env::block_timestamp(){
-            env::log_str(&"ya paso la hora d hacer bids".to_string());
-                // change the state to expired to dont allow more bids
+       if auction.auction_deadline.unwrap() <= (env::block_timestamp()/1000000){
+                 // change the state to expired to dont allow more bids
                 auction.status=AuctionStatus::Expired;
 
                 self.auctions_by_id.insert(&auction_id, &auction);
 
                 //panic by the end time
-                assert_eq!(auction.auction_deadline.unwrap() >= env::block_timestamp(),true,"The bid time has expired" );
+                assert_eq!(auction.auction_deadline.unwrap() >= (env::block_timestamp()/1000000),true,"The bid time has expired" );
 
             }
         //Review that  base amount is the required
@@ -277,15 +284,8 @@ impl NFTAuctions {
         auction.status=AuctionStatus::Bidded;
         auction.bidder_id = Some(signer_id.clone());
         auction.auction_payback=attached_deposit.clone().into();
-        auction.auction_time = Some(env::block_timestamp());
-        auction.auction_deadline = Some(env::block_timestamp()+60000000000);
-         self.total_amount+=attached_deposit;
-        //auction.auction_deadline = Some(env::block_timestamp()+self.payment_period);
-
-         
-
-             
-          
+        auction.auction_time = Some(env::block_timestamp()/1000000);
+        self.total_amount+=attached_deposit;  
         
          self.auctions_by_id.insert(&auction_id, &auction);
          
@@ -392,9 +392,9 @@ impl NFTAuctions {
         // we put assert that the status is biddded to allow more bids
         auction.status=AuctionStatus::Bidded;
         //we update the auctions time
-        auction.auction_time = Some(env::block_timestamp());
+        auction.auction_time = Some(env::block_timestamp()/1000000);
         //and we give more time to be bided
-        auction.auction_deadline = Some(env::block_timestamp()+self.payment_period);
+        auction.auction_deadline = Some(env::block_timestamp()/1000000+self.payment_period);
         self.auctions_by_id.insert(&auction_id, &auction);
        
 
@@ -408,7 +408,7 @@ impl NFTAuctions {
         //use a expect and explain that the auction wasnt found
         let mut auction:Auction = self.auctions_by_id.get(&auction_id).expect("the token doesn't have an active auction");
         let signer_id=env::signer_account_id();
-        let time_stamp=env::block_timestamp();
+        let time_stamp=env::block_timestamp()/1000000;
         let deposit = env::attached_deposit();
         let old_owner=auction.nft_owner.clone();
         let auction_payback=auction.auction_payback.clone();
@@ -462,7 +462,7 @@ impl NFTAuctions {
             ext_nft::mint(
                 signer_id.clone(),
                 tokens_to_mint.to_string(),
-                NTVTOKEN_CONTRACT.to_string().try_into().unwrap(),
+                self.ntv_token_contract.to_string().try_into().unwrap(),
                 0000000000000000000000001,
                 10_000_000_000_000.into(),
             );
@@ -470,7 +470,7 @@ impl NFTAuctions {
             ext_nft::mint(
                 old_owner,
                 tokens_to_mint.to_string(),
-                NTVTOKEN_CONTRACT.to_string().try_into().unwrap(),
+                self.ntv_token_contract.to_string().try_into().unwrap(),
                 0000000000000000000000001,
                 10_000_000_000_000.into(),
             );
@@ -491,72 +491,11 @@ impl NFTAuctions {
     }
 
 
-    /**/
-    // set a new owner
-   
-    pub fn set_new_owner(&mut self,new_owner:AccountId) -> String {
-        self.is_the_owner();
-        self.owner_account_id=new_owner;
-        self.owner_account_id.to_string()
-    }
-    // set a new treasury
-     pub fn set_new_treasury(&mut self,new_treasury:AccountId) -> String {
-        self.is_the_owner();
-        self.treasury_account_id=new_treasury;
-        self.treasury_account_id.to_string()
-    }
+ 
 
-     // set a new contract interest
 
-     pub fn set_new_contract_interest(&mut self,new_contract_interest:u64) -> String {
-         self.is_the_owner();
-         self.contract_interest=new_contract_interest;
-         self.contract_interest.to_string()
-     }
 
-      // set a new contract interest
-       pub fn set_new_payment_period(&mut self,new_payment_period:u64) -> String {
-          self.is_the_owner();
-          self.payment_period=new_payment_period;
-          self.payment_period.to_string()
-      }
-        // set a new contract interest
-       pub fn set_new_contract_fee(&mut self,new_contract_fee:u64) -> String {
-          self.is_the_owner();
-          self.contract_fee=new_contract_fee;
-          self.contract_fee.to_string()
-      }
-
-       pub fn set_is_minting_ntv(&mut self,is_enable:bool) -> String {
-          self.is_the_owner();
-          self.is_minting_ntv=is_enable;
-          self.is_minting_ntv.to_string()
-      }
-      pub fn get_auctions_stats(& self) -> Metrics {
-         let metrics = Metrics {
-             
-              total_auctions: self.last_auction_id,
-             
-              total_amount_deposited: self.total_amount.into(),
-             
-              ntv_status:self.is_minting_ntv,
-             
-              total_auctions_active: self.auctions_active,
-             
-              total_auctions_amount_sold: self.auctions_amount_sold.into(),
-             
-              max_auctions_ath: self.auctions_current_ath.into(),
-        };
-        metrics
-    }
-     //method to test the remote upgrade
-     pub fn remote_done(&self) -> String {
-        "Holaa remote now2 ".to_string()
-     }
-
-      fn is_the_owner(&self){
-        assert_eq!(self.owner_account_id,env::signer_account_id(),"you aren't the owner")
-     }
+ 
 }
 
 
