@@ -102,7 +102,7 @@ impl NFTAuctions {
     }
  
     //View the auction_id of the last auction
-    pub fn get_contract_interes(&self)-> u64 {
+    pub fn get_contract_interest(&self)-> u64 {
         self.contract_interest
     }
     

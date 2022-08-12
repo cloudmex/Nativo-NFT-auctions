@@ -28,7 +28,7 @@
 ### View who is the treasury account
 ` near view $CONTRACT_ID get_contract_treasury`
 ### View the contract interes
-` near view $CONTRACT_ID get_contract_interes `
+` near view $CONTRACT_ID get_contract_interest`
 ### View the contract payment period
 ` near view $CONTRACT_ID get_payment_period   `
 ### View the contract contract_fee
