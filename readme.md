@@ -1,6 +1,6 @@
 # Nativo NFT - P2P auctions
 
-![Logo](https://v2.nativonft.app/static/media/nativologocrop.15afa4d2.png)
+![Logo](https://develop.testnet.nativonft.app/static/media/LogoBlanco.30fcfa22.png)
 
 ## NFT auctions allows you to have access to liquidity without loosing the ownership of your NFT's
 ### 1. Secure your NFT in NFT auctions and request an amount of tokens
