@@ -221,6 +221,7 @@ impl NFTAuctions {
         self.payment_period.clone()
     }
     
+    
     pub fn get_contract_fee(&self)->u64 {
         self.contract_fee.clone()
     }
@@ -237,5 +238,14 @@ impl NFTAuctions {
     }
     pub fn get_auctions_current_ath(&self)->u128 {
         self.auctions_current_ath
+    }
+
+
+
+    pub(crate) fn to_sec(timestamp: Timestamp) -> TimestampSec {
+        (timestamp / 10u64.pow(9)) as u32
+    }
+    pub(crate) fn to_sec_u64(timestamp: Timestamp) -> Timestamp {
+        timestamp / 10u64.pow(9) 
     }
 }

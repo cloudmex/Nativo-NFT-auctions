@@ -4,10 +4,12 @@ use near_sdk::collections::{LookupMap, UnorderedMap, UnorderedSet};
 use near_sdk::{env,ext_contract,Gas, Balance, near_bindgen, AccountId, PromiseOrValue,PanicOnDefault,CryptoHash,serde_json::json};
 use near_sdk::serde::{Deserialize, Serialize};
 
-use near_sdk::json_types::{U128};
+use near_sdk::json_types::{U128,Base64VecU8};
 use near_sdk::serde_json::{from_str};
-use near_sdk::Promise;
+use near_sdk::{Promise, PromiseResult};
 use uint::construct_uint;
+use std::collections::HashMap;
+
 
 //use std::cmp::min;
 
@@ -26,11 +28,13 @@ mod internal;
  
 pub type EpochHeight = u64;
 pub type SalePriceInYoctoNear = U128;
+pub type TokenId = String;
 
 construct_uint! {
     /// 256-bit unsigned integer.
     pub struct U256(4);
 }
+ 
 /// Helper structure for keys of the persistent collections.
 #[derive(BorshSerialize)]
 pub enum StorageKey {
@@ -59,6 +63,9 @@ trait NonFungibleToken {
         token_id: String,
         msg: String,
     );
+
+     // change methods
+    fn get_promise_result(&self,contract_id:AccountId,signer_id:AccountId,msg_json:MsgInput) -> String;
 
 }
 
@@ -116,6 +123,9 @@ pub struct NFTAuctions {
 #[ext_contract(ext_nft)]
 pub trait ExternsContract {
     fn mint(&self, account_id:AccountId,amount: String) -> String;
+    fn nft_token(& self,token_id: TokenId);
+    
+
  }
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
@@ -199,48 +209,27 @@ impl NFTAuctions {
     // This method is called from the NFT contract
     // When transfered succesful it is saved as a new requesting for auctioning
     pub fn nft_on_transfer(&mut self,sender_id: AccountId,previous_owner_id: AccountId,token_id: String,msg: String)  -> PromiseOrValue<bool>{
-        env::log_str(&msg.to_string());
+        
        
-        let id:AuctionId = self.last_auction_id as u128;
         let contract_id = env::predecessor_account_id();
         let signer_id = env::signer_account_id();
         let msg_json: MsgInput = from_str(&msg).unwrap();
         let bid_start_id=0 as u128;
-        //calculate amount to be payed 
-        let amount_to_auctioner:u128 = u128::from(msg_json.auction_amount_requested)+(u128::from(msg_json.auction_amount_requested)*u128::from(self.contract_interest)/10000);
-        env::log_str(&amount_to_auctioner.to_string());
-        let media = msg_json.media.expect("the media is empty");
-
-        //assert that the token and contract dont already exists in a old auction
-        let new_auction = Auction{
-            nft_contract:contract_id,
-            nft_id:token_id,
-            nft_owner:signer_id.clone() ,
-            nft_media:Some(media),
-            description:msg_json.description,
-            auction_base_requested:msg_json.auction_amount_requested,
-            auction_payback:msg_json.auction_amount_requested,
-            status: AuctionStatus::Published,
-            submission_time: (env::block_timestamp()/1000000),
-            auction_time :None,
-            auction_deadline:Some( (env::block_timestamp()/1000000) + (self.payment_period*1000)),
-            bidder_id:None,
-            
-         };
-        self.auctions_by_id.insert(&id, &new_auction);
+ 
        
-        self.internal_add_auction_to_owner(&signer_id, &id);
-        self.last_auction_id += 1;
-        self.auctions_active += 1;
+        let p= ext_nft::nft_token(
+            token_id.clone(),
+            env::predecessor_account_id(), //contract account we're calling
+            0, //NEAR deposit we attach to the call
+            Gas(100_000_000_000_000), //GAS we're attaching
+        ) 
+        .then(ext_contract_nft::get_promise_result(contract_id,signer_id,msg_json,
+            env::current_account_id(), // el mismo contrato local
+            0,                                             // yocto NEAR a ajuntar al callback
+            Gas(15_000_000_000_000),                            // gas a ajuntar al callback
+        ));
+             
 
-        env::log_str(
-            &json!({
-            "type": "new_auction".to_string(),
-            "params":new_auction
-            })
-                .to_string(),
-        );
-        
      
         //If for some reason the contract failed it need to returns the NFT to the orig&inal owner (true)
         return PromiseOrValue::Value(false);
@@ -262,14 +251,14 @@ impl NFTAuctions {
         //Review that NFT is still available for auctioning
        assert_eq!(AuctionStatus::Published==auction.status || AuctionStatus::Bidded==auction.status ,true,"The NFT is not available for bidding");
        //check if the auction time has pased   
-       if auction.auction_deadline.unwrap() <= (env::block_timestamp()/1000000){
+       if auction.auction_deadline.unwrap() <= NFTAuctions::to_sec_u64(env::block_timestamp()){
                  // change the state to expired to dont allow more bids
-                auction.status=AuctionStatus::Expired;
+                auction.status=AuctionStatus::Finished;
 
                 self.auctions_by_id.insert(&auction_id, &auction);
 
                 //panic by the end time
-                assert_eq!(auction.auction_deadline.unwrap() >= (env::block_timestamp()/1000000),true,"The bid time has expired" );
+                assert_eq!(auction.auction_deadline.unwrap() >= NFTAuctions::to_sec_u64(env::block_timestamp()),true,"The bid time has expired" );
 
             }
         //Review that  base amount is the required
@@ -293,7 +282,7 @@ impl NFTAuctions {
         auction.status=AuctionStatus::Bidded;
         auction.bidder_id = Some(signer_id.clone());
         auction.auction_payback=attached_deposit.clone().into();
-        auction.auction_time = Some(env::block_timestamp()/1000000);
+        auction.auction_time = Some(NFTAuctions::to_sec_u64(env::block_timestamp()));
         self.total_amount+=attached_deposit;  
         
          self.auctions_by_id.insert(&auction_id, &auction);
@@ -328,7 +317,7 @@ impl NFTAuctions {
         }
 
         //1  owner cancel,the deadline is not over 
-            if auction.auction_deadline.unwrap() > (env::block_timestamp()/1000000) {
+            if auction.auction_deadline.unwrap() > NFTAuctions::to_sec_u64(env::block_timestamp()) {
                 //if have a bid
                 if auction.bidder_id.is_some(){
                      //Refound the bid
@@ -369,7 +358,7 @@ impl NFTAuctions {
             }
        
         //2  owner cancel,the deadline is over and dont have a bid
-         if auction.auction_deadline.unwrap() < (env::block_timestamp()/1000000) {
+         if auction.auction_deadline.unwrap() < NFTAuctions::to_sec_u64(env::block_timestamp()){
             //if have a bid
             if auction.bidder_id.is_some(){
                 //if the deadline is over
@@ -425,7 +414,7 @@ impl NFTAuctions {
             env::panic_str("You are not the last bidder ");
         }
         //if the auction is not over
-        if auction.auction_deadline.unwrap() > (env::block_timestamp()/1000000) {
+        if auction.auction_deadline.unwrap() > NFTAuctions::to_sec_u64(env::block_timestamp()) {
              //The bidder want to get back his money so we make a tranfers
                 if auction.bidder_id.is_some() {
                 
@@ -442,7 +431,7 @@ impl NFTAuctions {
                 auction.bidder_id=None;
                 auction.auction_payback=auction.auction_base_requested;
                 //and we give one day more to be bidded
-                auction.auction_deadline = Some(env::block_timestamp()/1000000+86400000);
+                auction.auction_deadline = Some(NFTAuctions::to_sec_u64(env::block_timestamp())+86400);
                 self.auctions_by_id.insert(&auction_id, &auction);
             
                 env::log_str(
@@ -455,7 +444,7 @@ impl NFTAuctions {
         }            
        
         //if the auction is  over
-        if auction.auction_deadline.unwrap() < (env::block_timestamp()/1000000) {
+        if auction.auction_deadline.unwrap() < NFTAuctions::to_sec_u64(env::block_timestamp()) {
             //The bidder want to get back his money but he wins
                if auction.bidder_id.is_some() {
                 env::panic_str("Sorry,you can't cancel the auction because has ended and you have win the auction,!please claim your prize¡.")
@@ -471,7 +460,7 @@ impl NFTAuctions {
         //use a expect and explain that the auction wasnt found
         let mut auction:Auction = self.auctions_by_id.get(&auction_id).expect("the token doesn't have an active auction");
         let signer_id=env::signer_account_id();
-        let time_stamp=env::block_timestamp()/1000000;
+        let time_stamp=NFTAuctions::to_sec_u64(env::block_timestamp());
         let deposit = env::attached_deposit();
         let old_owner=auction.nft_owner.clone();
         let auction_payback=auction.auction_payback.clone();
@@ -487,7 +476,6 @@ impl NFTAuctions {
         }
 
         auction.status=AuctionStatus::Claimed;
-        auction.description=Some( format!("{}{:?}", "Nft claimend by ".to_string(), auction.bidder_id.clone() ) );
         
         self.auctions_by_id.insert(&auction_id, &auction);
         self.internal_remove_auction_from_owner(&auction.nft_owner, &auction_id);
@@ -562,6 +550,64 @@ impl NFTAuctions {
     }
 
  
+
+     // Método de procesamiento para promesa
+     pub fn get_promise_result(&mut self ,contract_id:AccountId,signer_id:AccountId,msg_json:MsgInput) {
+         
+        assert_eq!(
+            env::promise_results_count(),
+            1,
+            "This is a callbacl module"
+        );
+        match env::promise_result(0) {
+            PromiseResult::NotReady => unreachable!(),
+            PromiseResult::Failed => {
+                env::log_str( &"the external contract failed".to_string());
+                 
+             }
+            PromiseResult::Successful(result) => {
+                let value = std::str::from_utf8(&result).unwrap();
+              //  env::log_str("regreso al market");
+              //  env::log_str(value);
+                let tg: JsonToken = near_sdk::serde_json::from_str(&value).unwrap();
+                let id:AuctionId = self.last_auction_id as u128;
+
+                let new_auction = Auction{
+                    nft_contract:contract_id,
+                    nft_id:tg.token_id,
+                    nft_owner:signer_id.clone(),
+                    nft_media:Some(tg.metadata.media.expect("the media is empty")),
+                    description:Some(tg.metadata.description.expect("the description is empty")),
+                    auction_base_requested:msg_json.auction_amount_requested,
+                    auction_payback:msg_json.auction_amount_requested,
+                    status: AuctionStatus::Published,
+                    submission_time: NFTAuctions::to_sec_u64(env::block_timestamp()) ,
+                    auction_time :None,
+                    auction_deadline:Some( NFTAuctions::to_sec_u64(env::block_timestamp()) + (self.payment_period)),
+                    bidder_id:None,
+                    
+                };
+                self.auctions_by_id.insert(&id, &new_auction);
+
+                self.internal_add_auction_to_owner(&signer_id, &id);
+                self.last_auction_id += 1;
+                self.auctions_active += 1;
+
+                env::log_str(
+                    &json!({
+                    "type": "new_auction".to_string(),
+                    "params":new_auction
+                    })
+                        .to_string(),
+                );
+
+
+                
+            }
+        }
+    }
+   
+      
 }
 
 

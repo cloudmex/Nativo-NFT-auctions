@@ -69,7 +69,7 @@ impl NFTAuctions {
               payment_period:        old_state.payment_period, // 1_000_000_000 * 60 * 60 * 24 * 7  ,
               contract_fee:          old_state.contract_fee,
               is_minting_ntv:        old_state.is_minting_ntv, //true,
-              ntv_multiply:          3, //old_state.ntv_multiply, //3,
+              ntv_multiply:          old_state.ntv_multiply, //3,
               auctions_active:       old_state.auctions_active, //0,
               auctions_amount_sold:  old_state.auctions_amount_sold, //0,
               auctions_current_ath:  old_state.auctions_current_ath, //0,
