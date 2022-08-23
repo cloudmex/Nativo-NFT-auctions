@@ -1,4 +1,4 @@
-# Nativo NFT - P2P auctions :wrench:
+# Nativo NFT - P2P auctions
 
 ![Logo](https://develop.testnet.nativonft.app/static/media/LogoBlanco.30fcfa22.png)
 
