@@ -5,13 +5,16 @@ impl NFTAuctions {
     #![allow(dead_code, unused_variables,irrefutable_let_patterns,)]
     #[warn(unconditional_recursion)]
     //get the information for a specific token ID
-    fn get_nft_auction(&self, auction_id: AuctionId) -> Option<AuctionOutput> {
+   pub fn get_nft_auction(&self, auction_id: AuctionId) -> Option<AuctionOutput> {
         //if there is some auction ID in the auctions_by_id collection
-        if let auctions = self.auctions_by_id.get(&auction_id).unwrap() {
+
+        let auction :Option<Auction>= self.auctions_by_id.get(&auction_id);
+
+        if auction.is_some() {
             //we'll return the data for that auction
             Some(AuctionOutput {
                 id:auction_id,
-                auction:auctions.into(),
+                auction:auction.unwrap().into(),
             })
         } else { //if there wasn't a auction ID in the auctions_by_id collection, we return None
             None
@@ -21,21 +24,16 @@ impl NFTAuctions {
     //get the information for a specific token ID
    pub fn get_bid_auction(&self, auction_id: AuctionId) -> Option< Vec<Bid>  >{
         //if there is some auction ID in the auctions_by_id collection
-        if let bid = self.bids_by_auction_id.get(&auction_id).unwrap() {
+        let bid:Option< UnorderedSet<Bid> >=self.bids_by_auction_id.get(&auction_id);
+        if  bid.is_some()  {
             //we'll return the data for that auction
-            Some(bid.to_vec())
+            Some(bid.unwrap().to_vec())
         } else { //if there wasn't a auction ID in the auctions_by_id collection, we return None
             None
         }
     }
 
-    // pub fn get_nft_auction(&self, auction_id: u64) -> AuctionOutput {
-    //     let auctions = self.auctions.get(&auction_id).expect("ERR_NO_auction");
-    //     AuctionOutput {
-    //         id:auction_id,
-    //         auction: auctions.into(),
-    //     }
-    // }
+ 
 
     //Query for nft tokens on the contract regardless of the owner using pagination
     pub fn get_all_nfts_for_auction(&self, from_index: Option<U128>, limit: Option<u64>) -> Vec<AuctionOutput> {
@@ -223,6 +221,7 @@ impl NFTAuctions {
         self.payment_period.clone()
     }
     
+    
     pub fn get_contract_fee(&self)->u64 {
         self.contract_fee.clone()
     }
@@ -239,5 +238,14 @@ impl NFTAuctions {
     }
     pub fn get_auctions_current_ath(&self)->u128 {
         self.auctions_current_ath
+    }
+
+
+
+    pub(crate) fn to_sec(timestamp: Timestamp) -> TimestampSec {
+        (timestamp / 10u64.pow(9)) as u32
+    }
+    pub(crate) fn to_sec_u64(timestamp: Timestamp) -> Timestamp {
+        timestamp / 10u64.pow(9) 
     }
 }
