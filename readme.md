@@ -59,7 +59,7 @@
 `near call $CONTRACT_ID set_new_contract_fee '{"new_contract_fee":100}' --accountId dokxo.testnet `
 
 ### Set  a new payment period
-`near call $CONTRACT_ID set_new_payment_period '{"new_payment_period":300}' --accountId dokxo.testnet `
+`near call $CONTRACT_ID set_new_payment_period '{"new_payment_period":900}' --accountId dokxo.testnet `
 ### set  a new is nvt minting
 `near call $CONTRACT_ID set_is_minting_ntv '{"is_enable":true}' --accountId dokxo.testnet`
 
@@ -76,7 +76,7 @@
 `near call $CONTRACT_ID bid_for_nft '{"auction_id":0}' --accountId darkdokxo.testnet --deposit 0.5`
 
 ### View the tokens paginated by Owner
-`near view $CONTRACT_ID auctions_for_owner '{"account_id":"alexiaab.testnet","from_index":"0","limit":50}' `
+`near view $CONTRACT_ID auctions_for_owner '{"account_id":"dokxo_test.testnet","from_index":"0","limit":50}' `
 ### View the auctions supply  by Owner
 `near view $CONTRACT_ID auction_supply_for_owner '{"account_id":"alexiaab.testnet","from_index":"0","limit":50}' `
 
@@ -105,7 +105,7 @@
 `near view paras-token-v2.testnet nft_token '{"token_id":"299:9"}' `
 
 ### Ask for a auctioning - Nativo NFT
-`near call minterv2.nativo-minter.testnet nft_transfer_call '{"receiver_id": "dev-1661196610363-39728493289974","token_id":"70", "msg": "{ \"auction_amount_requested\": \"100000000000000000000000\" }"}' --accountId dokxo.testnet --depositYocto 1 --gas 300000000000000`
+`near call minterv2.nativo-minter.testnet nft_transfer_call '{"receiver_id": "v2.nativo-auctions.testnet","token_id":"70", "msg": "{ \"auction_amount_requested\": \"100000000000000000000000\" }"}' --accountId dokxo_test.testnet --depositYocto 1 --gas 300000000000000`
 
 ### get the NFT info from Nativo NFT
 `near view minterv2.nativo-minter.testnet nft_token '{"token_id":"70"}' `
