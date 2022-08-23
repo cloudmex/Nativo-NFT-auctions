@@ -1,6 +1,6 @@
-# Nativo NFT - P2P auctions
+# Nativo NFT - P2P auctions :wrench:
 
-![Logo](https://v2.nativonft.app/static/media/nativologocrop.15afa4d2.png)
+![Logo](https://develop.testnet.nativonft.app/static/media/LogoBlanco.30fcfa22.png)
 
 ## NFT auctions allows you to have access to liquidity without loosing the ownership of your NFT's
 ### 1. Secure your NFT in NFT auctions and request an amount of tokens
@@ -106,6 +106,7 @@
 
 ### Ask for a auctioning - Nativo NFT
 `near call minterv2.nativo-minter.testnet nft_transfer_call '{"receiver_id": "dev-1661196610363-39728493289974","token_id":"70", "msg": "{ \"auction_amount_requested\": \"100000000000000000000000\" }"}' --accountId dokxo.testnet --depositYocto 1 --gas 300000000000000`
+
 ### get the NFT info from Nativo NFT
 `near view minterv2.nativo-minter.testnet nft_token '{"token_id":"70"}' `
 

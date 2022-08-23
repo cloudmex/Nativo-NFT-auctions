@@ -193,7 +193,7 @@ impl NFTAuctions {
             auctions_per_bidder: LookupMap::new(StorageKey::AuctionsPerBidder.try_to_vec().unwrap()),
             bids_by_auction_id: UnorderedMap::new(StorageKey::BidsById.try_to_vec().unwrap()),
             total_amount: 0,
-            payment_period:    1_000_000_000 * 60 * 60 * 24 * 7, //this is for a week
+            payment_period: 604800, //this is for a week
             contract_fee, //200=2%
             is_minting_ntv:true,
             ntv_multiply:3,
