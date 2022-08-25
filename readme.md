@@ -71,9 +71,13 @@
 ### View last auction
 `near view $CONTRACT_ID get_last_auction`
 ### View bids by auction  
-`near view $CONTRACT_ID get_nft_auction '{"auction_id":4}'`
+`near view $CONTRACT_ID get_nft_auction '{"auction_id":1}'`
 ### Bid NEARS in exchange of an NFT 
-`near call $CONTRACT_ID bid_for_nft '{"auction_id":0}' --accountId darkdokxo.testnet --deposit 0.5`
+`near call $CONTRACT_ID bid_for_nft '{"auction_id":3}' --accountId darkdokxo.testnet --deposit 0.5`
+### View the bids for an auction 
+`near call $CONTRACT_ID get_bid_auction '{"auction_id":3}' --accountId dokxo.testnet --deposit 0.5`
+
+
 
 ### View the tokens paginated by Owner
 `near view $CONTRACT_ID auctions_for_owner '{"account_id":"dokxo_test.testnet","from_index":"0","limit":50}' `
@@ -86,12 +90,10 @@
 `near view $CONTRACT_ID auction_supply_for_bidder '{"account_id":"alexiaab.testnet","from_index":"0","limit":50}' `
 
 ### Cancel your auction and recover your NFT
-`near call $CONTRACT_ID withdraw_nft_owner '{"auction_id":28}' --accountId dokxo.testnet --depositYocto 1 --gas 100000000000000`
-### Cancel the last bid by bidder
-`near call $CONTRACT_ID withdraw_nft_auctioner ‘{“auction_id”:15}’ --accountId joehank.testnet --depositYocto 1 --gas 100000000000000`
-
+`near call $CONTRACT_ID withdraw_nft_owner '{"auction_id":2}' --accountId dokxo.testnet --depositYocto 1 --gas 100000000000000`
+ 
 ### Claim the NFT if you were the highest bidder
-`near call $CONTRACT_ID claim_nft_winner '{"auction_id":0}' --accountId dokxo.testnet --depositYocto 1 --gas 100000000000000`
+`near call $CONTRACT_ID claim_nft_winner '{"auction_id":1}' --accountId dokxo.testnet --depositYocto 1 --gas 100000000000000`
 
 
 ### Ask for a auctioning - Mintbase
@@ -105,7 +107,7 @@
 `near view paras-token-v2.testnet nft_token '{"token_id":"299:9"}' `
 
 ### Ask for a auctioning - Nativo NFT
-`near call minterv2.nativo-minter.testnet nft_transfer_call '{"receiver_id": "v2.nativo-auctions.testnet","token_id":"70", "msg": "{ \"auction_amount_requested\": \"100000000000000000000000\" }"}' --accountId dokxo_test.testnet --depositYocto 1 --gas 300000000000000`
+`near call minterv2.nativo-minter.testnet nft_transfer_call '{"receiver_id": "dev-1661196610363-39728493289974","token_id":"3", "msg": "{ \"auction_amount_requested\": \"100000000000000000000000\" }"}' --accountId dokxo.testnet --depositYocto 1 --gas 300000000000000`
 
 ### get the NFT info from Nativo NFT
 `near view minterv2.nativo-minter.testnet nft_token '{"token_id":"70"}' `

@@ -73,7 +73,7 @@ pub struct Auction {
 pub struct Bid {
     /// Id of the auction.
     pub bidder_id: AccountId,
-
+    pub bidded_at: u64,
     pub bid_amount: SalePriceInYoctoNear,
 }
 

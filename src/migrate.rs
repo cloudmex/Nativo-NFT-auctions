@@ -73,7 +73,7 @@ impl NFTAuctions {
               auctions_active:       old_state.auctions_active, //0,
               auctions_amount_sold:  old_state.auctions_amount_sold, //0,
               auctions_current_ath:  old_state.auctions_current_ath, //0,
-              ntv_token_contract:    "nativo_token.testnet".to_string(),
+              ntv_token_contract:    old_state.ntv_token_contract,
 
         }
     }

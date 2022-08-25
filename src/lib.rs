@@ -130,40 +130,41 @@ pub trait ExternsContract {
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct PrevNFTAuctions {
-    /// Owner's account ID (it will be a DAO on phase II)
-    pub owner_account_id: AccountId,
-    /// Owner's account ID (it will be a DAO on phase II)
-    pub treasury_account_id: AccountId,
-    //Index for auctions
-    pub last_auction_id: u64,
-    // Transaction interest estimated for the NFT payment
-    // It is based as 10000=100%
-    pub contract_interest: u64,
-    //keeps track of the auction struct for a given auction ID
-    pub auctions_by_id: UnorderedMap<AuctionId, Auction>,
-    //keeps track of all the auction IDs for a given account
-    pub auctions_per_owner: LookupMap<AccountId, UnorderedSet<AuctionId>>,
-    //keeps track of all the auction IDs for a given account
-    pub auctions_per_bidder: LookupMap<AccountId, UnorderedSet<AuctionId>>,
+  /// Owner's account ID (it will be a DAO on phase II)
+  pub owner_account_id: AccountId,
+  /// Owner's account ID (it will be a DAO on phase II)
+  pub treasury_account_id: AccountId,
+  //Index for auctions
+  pub last_auction_id: u64,
+  // Transaction interest estimated for the NFT payment
+  // It is based as 10000=100%
+  pub contract_interest: u64,
+  //keeps track of the auction struct for a given auction ID
+  pub auctions_by_id: UnorderedMap<AuctionId, Auction>,
+  //keeps track of all the auction IDs for a given account
+  pub auctions_per_owner: LookupMap<AccountId, UnorderedSet<AuctionId>>,
+  //keeps track of all the auction IDs for a given account
+  pub auctions_per_bidder: LookupMap<AccountId, UnorderedSet<AuctionId>>,
 
-    pub bids_by_auction_id: UnorderedMap<AuctionId, UnorderedSet<Bid>>,
-    /// Total token amount deposited.
-    pub total_amount: Balance,
-    /// Duration of payment period for auctions
-    pub payment_period: u64,
-    /// Fee payed to Nativo auctions
-    pub contract_fee:u64, //200=2%
-     // a flag to start/stop the ntv minting
-     pub is_minting_ntv:bool,
-
-     pub ntv_multiply:u128,
-
-     //how much auctions are running
-     pub auctions_active: u128,
-     //how much money has made by auctions
-     pub auctions_amount_sold: u128,
-     //how much ATH has made by auctions
-     pub auctions_current_ath: u128,
+  pub bids_by_auction_id: UnorderedMap<AuctionId, UnorderedSet<Bid>>,
+  /// Total token amount deposited.
+  pub total_amount: Balance,
+  /// Duration of payment period for auctions
+  pub payment_period: u64,
+  /// Fee payed to Nativo auctions
+  pub contract_fee:u64, //200=2%
+  // a flag to start/stop the ntv minting
+  pub is_minting_ntv:bool,
+  //
+  pub ntv_multiply:u128,
+  //how much auctions are running
+  pub auctions_active: u128,
+  //how much money has made by auctions
+  pub auctions_amount_sold: u128,
+  //how much ATH has made by auctions
+  pub auctions_current_ath: u128,
+  
+  pub ntv_token_contract:String,   
 }
 
 
@@ -243,7 +244,9 @@ impl NFTAuctions {
         //prepare a new Bid structure with the bidder info 
         let new_bid =Bid{
             bidder_id:env::signer_account_id(),
-            bid_amount:env::attached_deposit().into()};
+            bidded_at:NFTAuctions::to_sec_u64(env::block_timestamp()),
+            bid_amount:env::attached_deposit().into()
+        };
 
         let signer_id =env::signer_account_id();
         let attached_deposit=env::attached_deposit();
@@ -269,6 +272,9 @@ impl NFTAuctions {
 
         //Review that Bidder is not the same as NFT owner
         assert_ne!(signer_id.clone(),auction.nft_owner,"The owner cannot be the Bidder");
+
+        //Review that Bidder is not the same as Told bidder
+        assert_ne!(signer_id.clone(),auction.bidder_id.clone().unwrap(),"you cannot bid again ");
 
         //if exist a old bidder we must to refound the money to the old bidder
         if auction.bidder_id.is_some() {
@@ -320,12 +326,15 @@ impl NFTAuctions {
             if auction.auction_deadline.unwrap() > NFTAuctions::to_sec_u64(env::block_timestamp()) {
                 //if have a bid
                 if auction.bidder_id.is_some(){
-                     //Refound the bid
-                    let old_bidder_id = auction.bidder_id.clone().unwrap();
-                    let old_bidder_balance = auction.auction_payback.clone();
-                    Promise::new(old_bidder_id).transfer(old_bidder_balance.into()); //before the owner recived the amount for treasury
-                    self.internal_remove_auction_from_bidder(&auction.bidder_id.clone().unwrap(), &auction_id);
-                    env::log_str("transfer to the old bidder done");
+                    //  //Refound the bid
+                    // let old_bidder_id = auction.bidder_id.clone().unwrap();
+                    // let old_bidder_balance = auction.auction_payback.clone();
+                    // Promise::new(old_bidder_id).transfer(old_bidder_balance.into()); //before the owner recived the amount for treasury
+                    // self.internal_remove_auction_from_bidder(&auction.bidder_id.clone().unwrap(), &auction_id);
+                    // env::log_str("transfer to the old bidder done");
+
+                    //
+                    env::panic_str("You have a bid,you can not cancel the auction");
                 } 
                    //just cancel the auction and transfer the NFT to the owner
                    auction.status=AuctionStatus::Canceled;
@@ -397,61 +406,62 @@ impl NFTAuctions {
     
 
     //Canceled public offer for bid by the last bidder
-    #[payable]
-    pub fn withdraw_bid_bidder(&mut self, auction_id: u128){
-        //use a expect and explain that the auction wasnt found
-        let mut auction:Auction = self.auctions_by_id.get(&auction_id).expect("the token doesn't have an active auction");
-        let signer_id =env::signer_account_id();
-        let deposit = env::attached_deposit();
-     // assert that the auctions wasnt canceled or claimed
-        assert!(auction.status!=AuctionStatus::Canceled,"The auction was canceled.");
-        assert!(auction.status!=AuctionStatus::Claimed,"The auction was claimed.");
+    // #[payable]
+    // #[private]
+    // fn withdraw_bid_bidder(&mut self, auction_id: u128){
+    //     //use a expect and explain that the auction wasnt found
+    //     let mut auction:Auction = self.auctions_by_id.get(&auction_id).expect("the token doesn't have an active auction");
+    //     let signer_id =env::signer_account_id();
+    //     let deposit = env::attached_deposit();
+    //  // assert that the auctions wasnt canceled or claimed
+    //     assert!(auction.status!=AuctionStatus::Canceled,"The auction was canceled.");
+    //     assert!(auction.status!=AuctionStatus::Claimed,"The auction was claimed.");
 
          
-        //Review that claimer is the same as NFT owner
+    //     //Review that claimer is the same as NFT owner
        
-        if signer_id != auction.bidder_id.clone().unwrap(){
-            env::panic_str("You are not the last bidder ");
-        }
-        //if the auction is not over
-        if auction.auction_deadline.unwrap() > NFTAuctions::to_sec_u64(env::block_timestamp()) {
-             //The bidder want to get back his money so we make a tranfers
-                if auction.bidder_id.is_some() {
+    //     if signer_id != auction.bidder_id.clone().unwrap(){
+    //         env::panic_str("You are not the last bidder ");
+    //     }
+    //     //if the auction is not over
+    //     if auction.auction_deadline.unwrap() > NFTAuctions::to_sec_u64(env::block_timestamp()) {
+    //          //The bidder want to get back his money so we make a tranfers
+    //             if auction.bidder_id.is_some() {
                 
 
-                    let old_bidder_id = auction.bidder_id.clone().unwrap();
-                    let old_bidder_balance = auction.auction_payback.clone();
-                    Promise::new(old_bidder_id).transfer(old_bidder_balance.into()); //before the owner recived the amount for treasury
-                    self.internal_remove_auction_from_bidder(&auction.bidder_id.clone().unwrap(), &auction_id);
-                    env::log_str("transfer to the old bidder done");
-                }
+    //                 let old_bidder_id = auction.bidder_id.clone().unwrap();
+    //                 let old_bidder_balance = auction.auction_payback.clone();
+    //                 Promise::new(old_bidder_id).transfer(old_bidder_balance.into()); //before the owner recived the amount for treasury
+    //                 self.internal_remove_auction_from_bidder(&auction.bidder_id.clone().unwrap(), &auction_id);
+    //                 env::log_str("transfer to the old bidder done");
+    //             }
 
-                // we put assert that the status is biddded to allow more bids
-                auction.status=AuctionStatus::Published;
-                auction.bidder_id=None;
-                auction.auction_payback=auction.auction_base_requested;
-                //and we give one day more to be bidded
-                auction.auction_deadline = Some(NFTAuctions::to_sec_u64(env::block_timestamp())+86400);
-                self.auctions_by_id.insert(&auction_id, &auction);
+    //             // we put assert that the status is biddded to allow more bids
+    //             auction.status=AuctionStatus::Published;
+    //             auction.bidder_id=None;
+    //             auction.auction_payback=auction.auction_base_requested;
+    //             //and we give one day more to be bidded
+    //             auction.auction_deadline = Some(NFTAuctions::to_sec_u64(env::block_timestamp())+86400);
+    //             self.auctions_by_id.insert(&auction_id, &auction);
             
-                env::log_str(
-                    &json!({
-                    "type": "withdraw_bid_bidder".to_string(),
-                    "params":auction
-                    })
-                        .to_string(),
-                );
-        }            
+    //             env::log_str(
+    //                 &json!({
+    //                 "type": "withdraw_bid_bidder".to_string(),
+    //                 "params":auction
+    //                 })
+    //                     .to_string(),
+    //             );
+    //     }            
        
-        //if the auction is  over
-        if auction.auction_deadline.unwrap() < NFTAuctions::to_sec_u64(env::block_timestamp()) {
-            //The bidder want to get back his money but he wins
-               if auction.bidder_id.is_some() {
-                env::panic_str("Sorry,you can't cancel the auction because has ended and you have win the auction,!please claim your prize¡.")
-               }     
-       }            
+    //     //if the auction is  over
+    //     if auction.auction_deadline.unwrap() < NFTAuctions::to_sec_u64(env::block_timestamp()) {
+    //         //The bidder want to get back his money but he wins
+    //            if auction.bidder_id.is_some() {
+    //             env::panic_str("Sorry,you can't cancel the auction because has ended and you have win the auction,!please claim your prize¡.")
+    //            }     
+    //    }            
     
-    }   
+    // }   
     
     //If time has passed and the auction has a bid
     //The bidder can claim the NFT and transfer to their wallet
