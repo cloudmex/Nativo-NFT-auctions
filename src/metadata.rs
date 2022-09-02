@@ -125,11 +125,11 @@ pub struct JsonToken {
     //token metadata
     pub metadata: TokenMetadata,
     //creator of the token
-    pub creator_id: AccountId,
+    pub creator_id: Option <AccountId>,
     //list of approved account IDs that have access to transfer the token. This maps an account ID to an approval ID
     pub approved_account_ids: HashMap<AccountId, u64>,
     //keep track of the royalty percentages for the token in a hash map
-    pub royalty: HashMap<AccountId, u32>,
+    pub royalty: Option< HashMap<AccountId, u32> >,
 }
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
@@ -139,7 +139,7 @@ pub struct TokenMetadata {
     pub media: Option<String>, // URL to associated media, preferably to decentralized, content-addressed storage
     pub media_hash: Option<Base64VecU8>, // Base64-encoded sha256 hash of content referenced by the `media` field. Required if `media` is included.
     pub copies: Option<u64>, // number of copies of this set of metadata in existence when token was minted.
-    pub issued_at: Option<u64>, // When token was issued or minted, Unix epoch in milliseconds
+    pub issued_at: Option<String>, // When token was issued or minted, Unix epoch in milliseconds
     pub expires_at: Option<u64>, // When token expires, Unix epoch in milliseconds
     pub starts_at: Option<u64>, // When token starts being valid, Unix epoch in milliseconds
     pub updated_at: Option<u64>, // When token was last updated, Unix epoch in milliseconds

@@ -96,24 +96,31 @@
 `near call $CONTRACT_ID claim_nft_winner '{"auction_id":1}' --accountId dokxo.testnet --depositYocto 1 --gas 100000000000000`
 
 
-### Ask for a auctioning - Mintbase
-`near call alst77.mintspace2.testnet nft_transfer_call '{"receiver_id": "dev-1648670267690-23487881027419","token_id":"0", "msg": "{\"auction_amount_requested\": 100000000000000000000000000 }"}' --accountId alan_test.testnet --depositYocto 1 --gas 300000000000000`
-### get the NFT info from -Mintbase
-`near view alst77.mintspace2.testnet  nft_token '{"token_id":"0"}' `
+## Ask for a auctioning - Mintbase
 
-### Ask for a auctioning - Paras Id
-`near call paras-token-v2.testnet nft_transfer_call '{"receiver_id": "dev-1647921766612-74437195022952","token_id": "299:9", "msg": "{\"auction_requested\": \"100000000000000000000000000\"}"}' --accountId alan_test.testnet --depositYocto 1  --gas 300000000000000`
+`near call cowboytest.mintspace2.testnet nft_transfer_call '{"receiver_id": "v2.nativo-auctions.testnet","token_id":"60", "msg": "{ \"auction_amount_requested\": \"100000000000000000000000\" }"}' --accountId dokxo.testnet --depositYocto 1 --gas 300000000000000`
+
+> ` we can not list tokens from mintbase because the transactions exceed the prepaid gas`
+
+**Failure** <em>[cowboytest.mintspace2.testnet]: Error: {"index":0,"kind":{"ExecutionError":</em> **"Exceeded the prepaid gas."** }}
+
+
+## Ask for a auctioning - Paras Id
+`near call paras-token-v2.testnet nft_transfer_call '{"receiver_id": "v2.nativo-auctions.testnet","token_id": "945:90", "msg": "{\"auction_amount_requested\": \"100000000000000000000000000\"}"}' --accountId dokxo.testnet --depositYocto 1  --gas 300000000000000`
 ### get the NFT info from Paras Id
-`near view paras-token-v2.testnet nft_token '{"token_id":"299:9"}' `
-
-### Ask for a auctioning - Nativo NFT
-`near call minterv2.nativo-minter.testnet nft_transfer_call '{"receiver_id": "dev-1661196610363-39728493289974","token_id":"3", "msg": "{ \"auction_amount_requested\": \"100000000000000000000000\" }"}' --accountId dokxo.testnet --depositYocto 1 --gas 300000000000000`
-
-### get the NFT info from Nativo NFT
-`near view minterv2.nativo-minter.testnet nft_token '{"token_id":"70"}' `
+`near view paras-token-v2.testnet nft_token '{"token_id":"945:90"}' `
 
 ### recover the token 
-`near call minterv2.nativo-minter.testnet nft_transfer '{"receiver_id": "alexiaab.testnet", "token_id": "85", "memo": "Go Team :)"}' --accountId v1.nativo-auctions.testnet --depositYocto 1 `
+`near call paras-token-v2.testnet nft_transfer '{"receiver_id": "dokxo.testnet", "token_id": "945:90", "memo": "Go Team :)"}' --accountId v2.nativo-auctions.testnet --depositYocto 1 `
+
+## Ask for a auctioning - Nativo NFT
+`near call minterv2.nativo-minter.testnet nft_transfer_call '{"receiver_id": "v2.nativo-auctions.testnet","token_id":"3", "msg": "{ \"auction_amount_requested\": \"100000000000000000000000\" }"}' --accountId dokxo.testnet --depositYocto 1 --gas 300000000000000`
+
+### get the NFT info from Nativo NFT
+`near view minterv2.nativo-minter.testnet nft_token '{"token_id":"3"}' `
+
+### recover the token 
+`near call minterv2.nativo-minter.testnet nft_transfer '{"receiver_id": "dokxo.testnet", "token_id": "3", "memo": "Go Team :)"}' --accountId v2.nativo-auctions.testnet --depositYocto 1 `
 
 
 ### delete sub-account

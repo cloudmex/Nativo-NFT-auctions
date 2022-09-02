@@ -273,11 +273,12 @@ impl NFTAuctions {
         //Review that Bidder is not the same as NFT owner
         assert_ne!(signer_id.clone(),auction.nft_owner,"The owner cannot be the Bidder");
 
-        //Review that Bidder is not the same as Told bidder
-        assert_ne!(signer_id.clone(),auction.bidder_id.clone().unwrap(),"you cannot bid again ");
-
+        
         //if exist a old bidder we must to refound the money to the old bidder
         if auction.bidder_id.is_some() {
+            //Review that Bidder is not the same as Told bidder
+        assert_ne!(signer_id.clone(),auction.bidder_id.clone().unwrap(),"you cannot bid again ");
+
             let old_bidder_id = auction.bidder_id.clone().unwrap();
             let old_bidder_balance = auction.auction_payback.clone();
             Promise::new(old_bidder_id).transfer(old_bidder_balance.into()); //before the owner recived the amount for treasury
@@ -510,6 +511,7 @@ impl NFTAuctions {
         let fee_percent=contract_percent/1000;
         let nativo_fee =amount_sold*fee_percent;
         let owner_payment =amount_sold-nativo_fee;
+        //we retrive the fee p
         Promise::new(self.treasury_account_id.clone()).transfer(nativo_fee); 
 
         Promise::new(old_owner.clone()).transfer(owner_payment); 
@@ -587,7 +589,7 @@ impl NFTAuctions {
                     nft_id:tg.token_id,
                     nft_owner:signer_id.clone(),
                     nft_media:Some(tg.metadata.media.expect("the media is empty")),
-                    description:Some(tg.metadata.description.expect("the description is empty")),
+                    description:Some(tg.metadata.description.unwrap_or("the description was empty".to_string()) ),
                     auction_base_requested:msg_json.auction_amount_requested,
                     auction_payback:msg_json.auction_amount_requested,
                     status: AuctionStatus::Published,

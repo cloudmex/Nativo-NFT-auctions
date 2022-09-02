@@ -37,6 +37,8 @@ impl NFTAuctions {
         // set a new contract interest
        pub fn set_new_contract_fee(&mut self,new_contract_fee:u64) -> String {
           self.is_the_owner();
+          assert_eq!(new_contract_fee > 1 && new_contract_fee <1000,true,"the comision have to be between 1 and 1000" );
+          
           self.contract_fee=new_contract_fee;
           self.contract_fee.to_string()
       }
