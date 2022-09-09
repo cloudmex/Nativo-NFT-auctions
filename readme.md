@@ -8,7 +8,7 @@
 
 ## Prepare the ENV
 ### Last Dev
-` export CONTRACT_ID="dev-1661196610363-39728493289974" `
+` export CONTRACT_ID="dev-1662748614063-69278698859308" `
 ### Sub account
 ` export CONTRACT_ID="v2.nativo-auctions.testnet"       `
 ### Initializing the contract
@@ -59,7 +59,7 @@
 `near call $CONTRACT_ID set_new_contract_fee '{"new_contract_fee":100}' --accountId dokxo.testnet `
 
 ### Set  a new payment period
-`near call $CONTRACT_ID set_new_payment_period '{"new_payment_period":900}' --accountId dokxo.testnet `
+`near call $CONTRACT_ID set_new_payment_period '{"new_payment_period":180}' --accountId dokxo.testnet `
 ### set  a new is nvt minting
 `near call $CONTRACT_ID set_is_minting_ntv '{"is_enable":true}' --accountId dokxo.testnet`
 
@@ -93,7 +93,7 @@
 `near call $CONTRACT_ID withdraw_nft_owner '{"auction_id":2}' --accountId dokxo.testnet --depositYocto 1 --gas 100000000000000`
  
 ### Claim the NFT if you were the highest bidder
-`near call $CONTRACT_ID claim_nft_winner '{"auction_id":1}' --accountId dokxo.testnet --depositYocto 1 --gas 100000000000000`
+`near call $CONTRACT_ID claim_nft_winner '{"auction_id":6}' --accountId dokxo_test.testnet --depositYocto 1 --gas 100000000000000`
 
 
 ## Ask for a auctioning - Mintbase
@@ -114,15 +114,16 @@
 `near call paras-token-v2.testnet nft_transfer '{"receiver_id": "dokxo.testnet", "token_id": "945:90", "memo": "Go Team :)"}' --accountId v2.nativo-auctions.testnet --depositYocto 1 `
 
 ## Ask for a auctioning - Nativo NFT
-`near call minterv2.nativo-minter.testnet nft_transfer_call '{"receiver_id": "v2.nativo-auctions.testnet","token_id":"3", "msg": "{ \"auction_amount_requested\": \"100000000000000000000000\" }"}' --accountId dokxo.testnet --depositYocto 1 --gas 300000000000000`
+`near call minterv2.nativo-minter.testnet nft_transfer_call '{"receiver_id": "dev-1662748614063-69278698859308","token_id":"93", "msg": "{ \"auction_amount_requested\": \"100000000000000000000000\" }"}' --accountId dokxo.testnet --depositYocto 1 --gas 300000000000000`
 
 ### get the NFT info from Nativo NFT
-`near view minterv2.nativo-minter.testnet nft_token '{"token_id":"3"}' `
+`near view minterv2.nativo-minter.testnet nft_token '{"token_id":"93"}' `
 
 ### recover the token 
-`near call minterv2.nativo-minter.testnet nft_transfer '{"receiver_id": "dokxo.testnet", "token_id": "3", "memo": "Go Team :)"}' --accountId v2.nativo-auctions.testnet --depositYocto 1 `
+`near call minterv2.nativo-minter.testnet nft_transfer '{"receiver_id": "dokxo.testnet", "token_id": "93", "memo": "Go Team :)"}' --accountId dev-1662748614063-69278698859308 --depositYocto 1 `
 
 
+near call minterv2.nativo-minter.testnet nft_transfer '{"receiver_id": "dokxo.testnet", "token_id": "93", "memo": "Go Team :)"}' --accountId darkdokxo.testnet --depositYocto 1 
 ### delete sub-account
 
 ` near delete v1.nativo-auctions.testnet nativo-auctions.testnet `

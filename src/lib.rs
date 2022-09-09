@@ -9,6 +9,7 @@ use near_sdk::serde_json::{from_str};
 use near_sdk::{Promise, PromiseResult};
 use uint::construct_uint;
 use std::collections::HashMap;
+use near_sdk::promise_result_as_success;
 
 
 //use std::cmp::min;
@@ -66,7 +67,20 @@ trait NonFungibleToken {
 
      // change methods
     fn get_promise_result(&self,contract_id:AccountId,signer_id:AccountId,msg_json:MsgInput) -> String;
-
+    fn nft_transfer_payout(
+        &mut self,
+        receiver_id: AccountId, //purchaser (person to transfer the NFT to)
+        token_id: TokenId, //token ID to transfer
+        approval_id: u64, //market contract's approval ID in order to transfer the token on behalf of the owner
+        memo: String, //memo (to include some context)
+        /*
+            the price that the token was purchased for. This will be used in conjunction with the royalty percentages
+            for the token in order to determine how much money should go to which account. 
+        */
+        balance: U128,
+        //the maximum amount of accounts the market can payout at once (this is limited by GAS)
+		max_len_payout: u32,
+    );
 }
 
 #[derive(Serialize, Deserialize)]
@@ -124,7 +138,12 @@ pub struct NFTAuctions {
 pub trait ExternsContract {
     fn mint(&self, account_id:AccountId,amount: String) -> String;
     fn nft_token(& self,token_id: TokenId);
-    
+    fn nft_approve(&mut self, token_id: TokenId, account_id: AccountId, msg: Option<String>) ;
+    fn resolve_purchase(
+        &mut self,
+        buyer_id: AccountId,
+        price: U128,
+    ) -> Promise;
 
  }
 #[near_bindgen]
@@ -217,7 +236,14 @@ impl NFTAuctions {
         let msg_json: MsgInput = from_str(&msg).unwrap();
         let bid_start_id=0 as u128;
  
-       
+       //the auction contract set itsefl as approval id
+        ext_nft::nft_approve(
+            token_id.clone(),
+            env::current_account_id(),
+            None, 
+            env::predecessor_account_id(),
+            1, Gas(15_000_000_000_000) );
+        //manage the token info as auction     
         let p= ext_nft::nft_token(
             token_id.clone(),
             env::predecessor_account_id(), //contract account we're calling
@@ -472,10 +498,10 @@ impl NFTAuctions {
         let mut auction:Auction = self.auctions_by_id.get(&auction_id).expect("the token doesn't have an active auction");
         let signer_id=env::signer_account_id();
         let time_stamp=NFTAuctions::to_sec_u64(env::block_timestamp());
-        let deposit = env::attached_deposit();
+        
         let old_owner=auction.nft_owner.clone();
         let auction_payback=auction.auction_payback.clone();
-
+       
         //assert that the bid time has passed
         assert_eq!(time_stamp>=auction.auction_deadline.unwrap(),true,"The payment auction time has not expired");
         
@@ -514,9 +540,7 @@ impl NFTAuctions {
         //we retrive the fee p
         Promise::new(self.treasury_account_id.clone()).transfer(nativo_fee); 
 
-        Promise::new(old_owner.clone()).transfer(owner_payment); 
-
-
+     
         //minting the nvt section
         if self.is_minting_ntv {
 
@@ -549,16 +573,36 @@ impl NFTAuctions {
             })
                 .to_string(),
         );
-        // Inside a contract function on ContractA, a cross contract call is started
-        // From ContractA to ContractB
-        ext_contract_nft::nft_transfer(
-        signer_id,
-        auction.nft_id.to_string(),
-        "Withdraw of NFT from Nativo auctions".to_string(),
-        auction.nft_contract, // contract account id
-        deposit, // yocto NEAR to attach
-        Gas::from(5_000_000_000_000) // gas to attach
+
+//  // // Inside a contract function on ContractA, a cross contract call is started
+//         // // From ContractA to ContractB
+//         ext_contract_nft::nft_transfer(
+//             signer_id,
+//             auction.nft_id.to_string(),
+//             "Withdraw of NFT from Nativo auctions".to_string(),
+//             auction.nft_contract, // contract account id
+//             deposit, // yocto NEAR to attach
+//             Gas::from(5_000_000_000_000) // gas to attach
+//             );
+
+
+//add the old owner as approval
+       //the auction contract set itsefl as approval id
+       ext_nft::nft_approve(
+        auction.clone().nft_id,
+        auction.clone().nft_owner,
+      None, 
+      auction.clone().nft_contract,
+        1, Gas(15_000_000_000_000) );
+
+          //process the purchase (which will remove the sale, transfer and get the payout from the nft contract, and then distribute royalties) 
+          self.process_claim(
+            auction.clone().nft_contract,
+            auction,
+            U128(owner_payment),
+            signer_id,
         );
+       
     }
 
  
@@ -584,7 +628,10 @@ impl NFTAuctions {
                 let tg: JsonToken = near_sdk::serde_json::from_str(&value).unwrap();
                 let id:AuctionId = self.last_auction_id as u128;
 
+                let roy :Option<HashMap<AccountId, u32>>= tg.royalty;
+
                 let new_auction = Auction{
+                    auction_id:Some((self.last_auction_id as u64).into()),
                     nft_contract:contract_id,
                     nft_id:tg.token_id,
                     nft_owner:signer_id.clone(),
@@ -597,7 +644,10 @@ impl NFTAuctions {
                     auction_time :None,
                     auction_deadline:Some( NFTAuctions::to_sec_u64(env::block_timestamp()) + (self.payment_period)),
                     bidder_id:None,
-                    
+                    approved_account_ids:Some( tg.approved_account_ids ),
+                    royalty: if roy.is_some() { roy }else{ None }, 
+
+                     
                 };
                 self.auctions_by_id.insert(&id, &new_auction);
 
@@ -620,56 +670,128 @@ impl NFTAuctions {
     }
    
       
-}
 
 
-// This are the tests
-// PENDING
-#[cfg(not(target_arch = "wasm32"))]
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use near_sdk::MockedBlockchain;
-    use near_sdk::{testing_env, VMContext};
 
-    fn get_context(input: Vec<u8>, is_view: bool) -> VMContext {
-        VMContext {
-            current_account_id: "alice_near".to_string(),
-            signer_account_id: "bob_near".to_string(),
-            signer_account_pk: vec![0, 1, 2],
-            predecessor_account_id: "carol_near".to_string(),
-            input,
-            block_index: 0,
-            block_timestamp: 0,
-            account_balance: 0,
-            account_locked_balance: 0,
-            storage_usage: 0,
-            attached_deposit: 0,
-            prepaid_gas: 10u64.pow(18),
-            random_seed: vec![0, 1, 2],
-            is_view,
-            output_data_receivers: vec![],
-            epoch_height: 0,
+    // 
+     //private function used when a sale is purchased. 
+    //this will remove the sale, transfer and get the payout from the nft contract, and then distribute royalties
+    #[private]
+    pub fn process_claim(
+        &mut self,
+        nft_contract_id: AccountId,
+        auction: Auction,
+        price: U128,
+        buyer_id: AccountId,
+    ) -> Promise {
+      
+      let token_id = auction.clone().nft_id;
+      let mut new_a=  self.auctions_by_id.get(&auction.clone().auction_id.unwrap()).unwrap();
+
+  
+      let approvals = auction.clone().approved_account_ids.unwrap();
+      let approvalid = *approvals.get(&env::current_account_id()).unwrap();
+      //new_a.approved_account_ids.unwrap().insert(auction.clone().nft_owner, approvalid+1);
+      let mut hm_apr =new_a.approved_account_ids.unwrap();
+      hm_apr.remove(&env::current_account_id());
+      hm_apr.insert(auction.clone().nft_owner, approvalid+1) ;
+      
+      new_a.approved_account_ids=Some(hm_apr);
+      self.auctions_by_id.insert(&auction.clone().auction_id.unwrap(), &new_a.clone());
+
+
+       // initiate a cross contract call to the nft contract. This will transfer the token to the buyer and return
+        //a payout object used for the market to distribute funds to the appropriate accounts.
+        ext_contract_nft::nft_transfer_payout(
+            buyer_id.clone(), //purchaser (person to transfer the NFT to)
+            token_id, //token ID to transfer
+            approvalid+1, //market contract's approval ID in order to transfer the token on behalf of the owner
+            "payout from market".to_string(), //memo (to include some context)
+            /*
+                the price that the token was purchased for. This will be used in conjunction with the royalty percentages
+                for the token in order to determine how much money should go to which account. 
+            */
+            price,
+			10, //the maximum amount of accounts the market can payout at once (this is limited by GAS)
+            nft_contract_id, //contract to initiate the cross contract call to
+            1, //yoctoNEAR to attach to the call
+            Gas::from(5_000_000_000_000), //GAS to attach to the call
+        )
+        //after the transfer payout has been initiated, we resolve the promise by calling our own resolve_purchase function. 
+        //resolve purchase will take the payout object returned from the nft_transfer_payout and actually pay the accounts
+        .then(ext_nft::resolve_purchase(
+            buyer_id, //the buyer and price are passed in incase something goes wrong and we need to refund the buyer
+            price,
+            env::current_account_id(), //we are invoking this function on the current contract
+            0, //don't attach any deposit
+            Gas::from(5_000_000_000_000), //GAS attached to the call to payout royalties
+        ))
+
+      
+    }
+
+
+    #[private]
+    pub fn resolve_purchase(
+        &mut self,
+        buyer_id: AccountId,
+        price: U128,
+    ) -> U128 {
+        // checking for payout information returned from the nft_transfer_payout method
+        let payout_option = promise_result_as_success().and_then(|value| {
+            //if we set the payout_option to None, that means something went wrong and we should refund the buyer
+            near_sdk::serde_json::from_slice::<Payout>(&value)
+                //converts the result to an optional value
+                .ok()
+                //returns None if the none. Otherwise executes the following logic
+                .and_then(|payout_object| {
+                    //we'll check if length of the payout object is > 10 or it's empty. In either case, we return None
+                    if payout_object.payout.len() > 10 || payout_object.payout.is_empty() {
+                      //  env::log_str("Cannot have more than 10 royalties");
+                        None
+                    
+                    //if the payout object is the correct length, we move forward
+                    } else {
+                        //we'll keep track of how much the nft contract wants us to payout. Starting at the full price payed by the buyer
+                        let mut remainder = price.0;
+                        
+                        //loop through the payout and subtract the values from the remainder. 
+                        for &value in payout_object.payout.values() {
+                            //checked sub checks for overflow or any errors and returns None if there are problems
+                            remainder = remainder.checked_sub(value.0)?;
+                        }
+                        //Check to see if the NFT contract sent back a faulty payout that requires us to pay more or too little. 
+                        //The remainder will be 0 if the payout summed to the total price. The remainder will be 1 if the royalties
+                        //we something like 3333 + 3333 + 3333. 
+                        if remainder == 0 || remainder == 1 {
+                            //set the payout_option to be the payout because nothing went wrong
+                            Some(payout_object.payout)
+                        } else {
+                            //if the remainder was anything but 1 or 0, we return None
+                            None
+                        }
+                    }
+                })
+        });
+
+        // if the payout option was some payout, we set this payout variable equal to that some payout
+        let payout = if let Some(payout_option) = payout_option {
+            payout_option
+        //if the payout option was None, we refund the buyer for the price they payed and return
+        } else {
+            Promise::new(buyer_id).transfer(u128::from(price));
+            // leave function and return the price that was refunded
+            return price;
+        };
+
+        // NEAR payouts
+        for (receiver_id, amount) in payout {
+            env::log_str(&format!("rece: {} amount: {}",receiver_id.clone(),amount.0.clone()));
+            Promise::new(receiver_id).transfer(amount.0);
         }
+
+        //return the price payout out
+        price
     }
 
-    #[test]
-    fn set_get_message() {
-        let context = get_context(vec![], false);
-        testing_env!(context);
-        let mut contract = StatusMessage::default();
-        contract.set_status("hello".to_string());
-        assert_eq!(
-            "hello".to_string(),
-            contract.get_status("bob_near".to_string()).unwrap()
-        );
-    }
-
-    #[test]
-    fn get_nonexistent_message() {
-        let context = get_context(vec![], true);
-        testing_env!(context);
-        let contract = StatusMessage::default();
-        assert_eq!(None, contract.get_status("francis.near".to_string()));
-    }
 }

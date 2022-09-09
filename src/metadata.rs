@@ -1,5 +1,5 @@
 use crate::*;
-
+ 
 //use std::mem::size_of;
 
 pub type AuctionId = u128;
@@ -37,11 +37,13 @@ pub enum AuctionStatus {
 }
 
 /// Proposal for auctioning that are sent to this DAO.
-#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
+#[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize,Clone)]
 #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
 #[serde(crate = "near_sdk::serde")]
 pub struct Auction {
     /// Original nft owner.
+    pub auction_id: Option<u128>,
+      /// Original nft owner.
     pub nft_owner: AccountId,
     /// Original nft contract.
     pub nft_contract: AccountId,
@@ -66,7 +68,17 @@ pub struct Auction {
     pub auction_deadline: Option<EpochHeight>,
     pub bidder_id: Option<AccountId>,
 
+    pub approved_account_ids:Option< HashMap<AccountId, u64> >,
+
+    pub royalty:Option< HashMap<AccountId, u32> >,
+
  }
+
+ #[derive(Serialize, Deserialize)]
+ #[serde(crate = "near_sdk::serde")]
+ pub struct Payout {
+     pub payout: HashMap<AccountId, U128>,
+ } 
 
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize,Debug)]
 #[serde(crate = "near_sdk::serde")]
@@ -129,6 +141,7 @@ pub struct JsonToken {
     //list of approved account IDs that have access to transfer the token. This maps an account ID to an approval ID
     pub approved_account_ids: HashMap<AccountId, u64>,
     //keep track of the royalty percentages for the token in a hash map
+    
     pub royalty: Option< HashMap<AccountId, u32> >,
 }
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize)]

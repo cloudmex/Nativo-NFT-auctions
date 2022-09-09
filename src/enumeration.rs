@@ -84,6 +84,7 @@ impl NFTAuctions {
     //its al helped method that return a empty auction
     fn new_auction  (&self) -> Auction{
         let new_auction = Auction{
+            auction_id:None,
             nft_contract:"null".to_string().try_into().unwrap(),
             nft_id:"null".to_string().try_into().unwrap(),
             nft_owner:"null".to_string().try_into().unwrap() ,
@@ -96,6 +97,8 @@ impl NFTAuctions {
             auction_time:None,
             auction_deadline:None,
             bidder_id:None,
+            approved_account_ids:None,
+            royalty:None,
             
          };
          new_auction
