@@ -142,6 +142,8 @@ pub trait ExternsContract {
     fn resolve_purchase(
         &mut self,
         buyer_id: AccountId,
+        own: AccountId,
+
         price: U128,
     ) -> Promise;
 
@@ -213,7 +215,7 @@ impl NFTAuctions {
             auctions_per_bidder: LookupMap::new(StorageKey::AuctionsPerBidder.try_to_vec().unwrap()),
             bids_by_auction_id: UnorderedMap::new(StorageKey::BidsById.try_to_vec().unwrap()),
             total_amount: 0,
-            payment_period: 604800, //this is for a week
+            payment_period: 120, //604800, //this is for a week
             contract_fee, //200=2%
             is_minting_ntv:true,
             ntv_multiply:3,
@@ -341,6 +343,7 @@ impl NFTAuctions {
         let mut auction:Auction = self.auctions_by_id.get(&auction_id).expect("the token doesn't have an active auction");
         let signer_id =env::signer_account_id();
         let deposit = env::attached_deposit();
+        let oldowner= auction.clone().nft_owner;
 
         assert!(auction.status!=AuctionStatus::Canceled,"The auction is canceled.");
         assert!(auction.status!=AuctionStatus::Claimed,"The auction was claimed.");
@@ -533,12 +536,12 @@ impl NFTAuctions {
             }
            // self.auctions_amount_sold+= 
         // we pay the highest bid to the owner auction
-        let contract_percent:u128 = self.contract_fee.into();
-        let fee_percent=contract_percent/1000;
-        let nativo_fee =amount_sold*fee_percent;
-        let owner_payment =amount_sold-nativo_fee;
+        let contract_percent:u64 = self.contract_fee;
+        let fee_percent:f64= contract_percent as f64/1000 as f64;
+        let nativo_fee =amount_sold as f64*fee_percent;
+        let owner_payment =amount_sold-nativo_fee as u128;
         //we retrive the fee p
-        Promise::new(self.treasury_account_id.clone()).transfer(nativo_fee); 
+        Promise::new(self.treasury_account_id.clone()).transfer(nativo_fee as u128); 
 
      
         //minting the nvt section
@@ -686,7 +689,8 @@ impl NFTAuctions {
     ) -> Promise {
       
       let token_id = auction.clone().nft_id;
-      let mut new_a=  self.auctions_by_id.get(&auction.clone().auction_id.unwrap()).unwrap();
+      let mut new_a=  self.auctions_by_id.get(&(auction.clone().auction_id.unwrap() as u128)).unwrap();
+        let own =  auction.clone().nft_owner;
 
   
       let approvals = auction.clone().approved_account_ids.unwrap();
@@ -697,7 +701,8 @@ impl NFTAuctions {
       hm_apr.insert(auction.clone().nft_owner, approvalid+1) ;
       
       new_a.approved_account_ids=Some(hm_apr);
-      self.auctions_by_id.insert(&auction.clone().auction_id.unwrap(), &new_a.clone());
+      
+      self.auctions_by_id.insert(&(auction.clone().auction_id.unwrap() as u128) , &new_a.clone());
 
 
        // initiate a cross contract call to the nft contract. This will transfer the token to the buyer and return
@@ -720,7 +725,8 @@ impl NFTAuctions {
         //after the transfer payout has been initiated, we resolve the promise by calling our own resolve_purchase function. 
         //resolve purchase will take the payout object returned from the nft_transfer_payout and actually pay the accounts
         .then(ext_nft::resolve_purchase(
-            buyer_id, //the buyer and price are passed in incase something goes wrong and we need to refund the buyer
+            buyer_id, 
+            own,//the buyer and price are passed in incase something goes wrong and we need to refund the buyer
             price,
             env::current_account_id(), //we are invoking this function on the current contract
             0, //don't attach any deposit
@@ -735,6 +741,8 @@ impl NFTAuctions {
     pub fn resolve_purchase(
         &mut self,
         buyer_id: AccountId,
+        own: AccountId,
+
         price: U128,
     ) -> U128 {
         // checking for payout information returned from the nft_transfer_payout method
@@ -786,8 +794,15 @@ impl NFTAuctions {
 
         // NEAR payouts
         for (receiver_id, amount) in payout {
-            env::log_str(&format!("rece: {} amount: {}",receiver_id.clone(),amount.0.clone()));
-            Promise::new(receiver_id).transfer(amount.0);
+            if receiver_id.eq(&env::current_account_id()){
+                env::log_str(&format!("rece: {} amount: {}",own.clone(),amount.0.clone()));
+                Promise::new(own.clone()).transfer(amount.0);
+            }
+            else{
+                env::log_str(&format!("rece: {} amount: {}",receiver_id.clone(),amount.0.clone()));
+                Promise::new(receiver_id).transfer(amount.0);
+            }
+            
         }
 
         //return the price payout out

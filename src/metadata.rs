@@ -42,7 +42,7 @@ pub enum AuctionStatus {
 #[serde(crate = "near_sdk::serde")]
 pub struct Auction {
     /// Original nft owner.
-    pub auction_id: Option<u128>,
+    pub auction_id: Option<u64>,
       /// Original nft owner.
     pub nft_owner: AccountId,
     /// Original nft contract.
