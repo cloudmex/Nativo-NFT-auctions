@@ -124,14 +124,4 @@
 
 
  
-### delete sub-account
-
-` near delete v2.nativo-auctions.testnet nativo-auctions.testnet `
-
-### create sub-account
-
-` near create-account v3.nativo-auctions.testnet --masterAccount nativo-auctions.testnet `
-
- 
- 
  

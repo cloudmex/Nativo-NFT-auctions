@@ -143,8 +143,9 @@ pub trait ExternsContract {
         &mut self,
         buyer_id: AccountId,
         own: AccountId,
-
         price: U128,
+       
+
     ) -> Promise;
 
  }
@@ -215,14 +216,14 @@ impl NFTAuctions {
             auctions_per_bidder: LookupMap::new(StorageKey::AuctionsPerBidder.try_to_vec().unwrap()),
             bids_by_auction_id: UnorderedMap::new(StorageKey::BidsById.try_to_vec().unwrap()),
             total_amount: 0,
-            payment_period: 120, //604800, //this is for a week
-            contract_fee, //200=2%
+            payment_period: 604800, //this is for a week
+            contract_fee,  //200=20%
             is_minting_ntv:true,
             ntv_multiply:3,
             auctions_active: 0,
             auctions_amount_sold: 0,
             auctions_current_ath: 0,
-            ntv_token_contract:    "nativo_token.testnet".to_string(),
+            ntv_token_contract:    "nativo_token.near".to_string(),
                 };
         return result;
     }
@@ -536,12 +537,12 @@ impl NFTAuctions {
             }
            // self.auctions_amount_sold+= 
         // we pay the highest bid to the owner auction
-        let contract_percent:u64 = self.contract_fee;
-        let fee_percent:f64= contract_percent as f64/1000 as f64;
-        let nativo_fee =amount_sold as f64*fee_percent;
-        let owner_payment =amount_sold-nativo_fee as u128;
-        //we retrive the fee p
-        Promise::new(self.treasury_account_id.clone()).transfer(nativo_fee as u128); 
+        // let contract_percent:u64 = self.contract_fee;
+        // let fee_percent:f64= contract_percent as f64/1000 as f64;
+        // let nativo_fee =amount_sold as f64*fee_percent;
+        // let owner_payment =amount_sold-nativo_fee as u128;
+        // //we retrive the fee p
+        // Promise::new(self.treasury_account_id.clone()).transfer(nativo_fee as u128); 
 
      
         //minting the nvt section
@@ -602,7 +603,7 @@ impl NFTAuctions {
           self.process_claim(
             auction.clone().nft_contract,
             auction,
-            U128(owner_payment),
+            U128(amount_sold),
             signer_id,
         );
        
@@ -690,7 +691,7 @@ impl NFTAuctions {
       
       let token_id = auction.clone().nft_id;
       let mut new_a=  self.auctions_by_id.get(&(auction.clone().auction_id.unwrap() as u128)).unwrap();
-        let own =  auction.clone().nft_owner;
+      let own =  auction.clone().nft_owner;
 
   
       let approvals = auction.clone().approved_account_ids.unwrap();
@@ -742,8 +743,8 @@ impl NFTAuctions {
         &mut self,
         buyer_id: AccountId,
         own: AccountId,
-
         price: U128,
+       
     ) -> U128 {
         // checking for payout information returned from the nft_transfer_payout method
         let payout_option = promise_result_as_success().and_then(|value| {
@@ -787,6 +788,7 @@ impl NFTAuctions {
             payout_option
         //if the payout option was None, we refund the buyer for the price they payed and return
         } else {
+            env::log_str(&format!("receiver: {} amount: {:?}",buyer_id.clone(),price.clone()));
             Promise::new(buyer_id).transfer(u128::from(price));
             // leave function and return the price that was refunded
             return price;
@@ -795,11 +797,24 @@ impl NFTAuctions {
         // NEAR payouts
         for (receiver_id, amount) in payout {
             if receiver_id.eq(&env::current_account_id()){
-                env::log_str(&format!("rece: {} amount: {}",own.clone(),amount.0.clone()));
-                Promise::new(own.clone()).transfer(amount.0);
+                //I charge the commission first
+                let contract_percent:u64 = self.contract_fee;
+                let fee_percent:f64= contract_percent as f64/1000 as f64;
+             
+                //calculate the nativo fee from the total 
+                let nativo_fee = price.0 as f64 * fee_percent;
+                // substract the nativo fee to the owner revenue
+                let owner_payment =amount.0 -nativo_fee as u128;
+                env::log_str(&format!("treasury: {} amount: {:?}",self.treasury_account_id.clone(),nativo_fee as u128 ));
+                //we retrive the fee 
+                Promise::new(self.treasury_account_id.clone()).transfer(nativo_fee as u128); 
+
+                // and then transfer the remainder
+                env::log_str(&format!("owner: {} amount: {}",own.clone(),owner_payment.clone()));
+                Promise::new(own.clone()).transfer(owner_payment);
             }
             else{
-                env::log_str(&format!("rece: {} amount: {}",receiver_id.clone(),amount.0.clone()));
+                env::log_str(&format!("royalty: {} amount: {}",receiver_id.clone(),amount.0.clone()));
                 Promise::new(receiver_id).transfer(amount.0);
             }
             
