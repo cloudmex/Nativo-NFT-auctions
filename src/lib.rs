@@ -15,6 +15,7 @@ use near_sdk::promise_result_as_success;
 //use std::cmp::min;
 
 //use crate::internal::*;
+pub use crate::events::*;
 pub use crate::metadata::*;
 pub use crate::migrate::*;
 pub use crate::dao::*;
@@ -23,6 +24,7 @@ mod enumeration;
 mod metadata;
 mod migrate;
 mod dao;
+mod events;
 
 mod internal;
 
@@ -277,6 +279,17 @@ impl NFTAuctions {
             bid_amount:env::attached_deposit().into()
         };
 
+
+        let mut new_offer=AddOffer {
+            current_owner_id:auction.clone().nft_owner,
+            old_bidder_account_id: None,
+            bidder_account_id: env::signer_account_id(),
+            nft_contract_id: auction.clone().nft_contract,
+            token_id: auction.clone().nft_id,
+            bidded_price: U128(env::attached_deposit().into()),
+            offer_time:NFTAuctions::to_sec_u64(env::block_timestamp()),
+            _type:Some("offer_sync".to_string()),
+      } ;
         let signer_id =env::signer_account_id();
         let attached_deposit=env::attached_deposit();
 
@@ -307,6 +320,8 @@ impl NFTAuctions {
         if auction.bidder_id.is_some() {
             //Review that Bidder is not the same as Told bidder
         assert_ne!(signer_id.clone(),auction.bidder_id.clone().unwrap(),"you cannot bid again ");
+            
+            new_offer.old_bidder_account_id=Some(auction.clone().bidder_id.unwrap());
 
             let old_bidder_id = auction.bidder_id.clone().unwrap();
             let old_bidder_balance = auction.auction_payback.clone();
@@ -326,13 +341,58 @@ impl NFTAuctions {
          self.internal_add_auction_to_bidder(&signer_id, &auction_id);
          self.internal_add_bid_to_auction(auction_id, &new_bid);
 
-        env::log_str(
-            &json!({
-            "type": "bid_for_auction".to_string(),
-            "params":auction
-            })
-                .to_string(),
-        );
+
+
+         NFTAuctions::event_add_offer(new_offer);
+        // env::log_str(
+        //     &json!({
+        //     "type": "bid_for_auction".to_string(),
+        //     "params":auction
+        //     })
+        //         .to_string(),
+        // );
+        return Some(auction);
+    }
+
+
+    //view an offert that throws a notification if something has chaged
+
+   
+    pub fn check_auction(& self, auction_id: u128) -> Option<Auction> {
+        //use a expect and explain that the auction wasnt found
+        let auction:Auction = self.auctions_by_id.get(&auction_id.clone()).expect("the token doesn't have an active auction");   
+        let signer_id =env::signer_account_id();
+        let attached_deposit=env::attached_deposit();
+
+
+        let mut st_offer=StatusOffer {
+        current_owner_id:auction.clone().nft_owner,
+        current_bidder_id: None,
+        nft_contract_id: auction.clone().nft_contract,
+        token_id: auction.clone().nft_id,
+        bid_price: U128(auction.clone().auction_payback.into()),
+        status:None, //AuctionStatus,
+        } ;
+       
+         //Review that NFT is still available for auctioning
+      // assert_eq!(AuctionStatus::Published==auction.status || AuctionStatus::Bidded==auction.status ,true,"The NFT is not available for bidding");
+       //check if the auction time has pased   
+       if auction.auction_deadline.unwrap() <= NFTAuctions::to_sec_u64(env::block_timestamp()){
+                 // change the state to expired to dont allow more bids
+
+                st_offer.status=Some(AuctionStatus::Finished);
+                
+            }
+          
+        //if exist a old bidder we must to refound the money to the old bidder
+        if auction.bidder_id.is_some() {
+         st_offer.current_bidder_id=Some(auction.clone().bidder_id.unwrap());
+         
+         }
+        
+
+         NFTAuctions::event_get_status(st_offer);
+    
         return Some(auction);
     }
 
@@ -346,6 +406,7 @@ impl NFTAuctions {
         let deposit = env::attached_deposit();
         let oldowner= auction.clone().nft_owner;
 
+       
         assert!(auction.status!=AuctionStatus::Canceled,"The auction is canceled.");
         assert!(auction.status!=AuctionStatus::Claimed,"The auction was claimed.");
         //Review that claimer is the same as NFT owner
@@ -515,7 +576,14 @@ impl NFTAuctions {
         if signer_id != auction.bidder_id.clone().unwrap(){
             env::panic_str("You can not claim this NFT");
         }
-
+        let  st_offer=StatusOffer {
+            current_owner_id:auction.clone().nft_owner,
+            current_bidder_id: auction.clone().bidder_id,
+            nft_contract_id: auction.clone().nft_contract,
+            token_id: auction.clone().nft_id,
+            bid_price: U128(auction.clone().auction_payback.into()),
+            status:Some(AuctionStatus::Claimed), //AuctionStatus,
+            } ;
         auction.status=AuctionStatus::Claimed;
         
         self.auctions_by_id.insert(&auction_id, &auction);
@@ -570,13 +638,14 @@ impl NFTAuctions {
             env::log_str("the nvt token minting is disabled");      
           }
 
-        env::log_str(
-            &json!({
-            "type": "claim_nft_winner".to_string(),
-            "params":auction
-            })
-                .to_string(),
-        );
+          NFTAuctions::event_get_status(st_offer);
+        // env::log_str(
+        //     &json!({
+        //     "type": "claim_nft_winner".to_string(),
+        //     "params":auction
+        //     })
+        //         .to_string(),
+        // );
 
 //  // // Inside a contract function on ContractA, a cross contract call is started
 //         // // From ContractA to ContractB
